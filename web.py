@@ -242,7 +242,7 @@ function checkBackfill(){
       b.style.display='flex';
       b.className='backfill-banner';
       if(s.phase==='playlists'){
-        b.innerHTML=`<span class="spinner"></span>Loading data: day <strong>${s.days_done||0}/${s.days_total||'?'}</strong> &middot; ${s.current_station||''} &middot; <strong>${(s.playlists_fetched||0).toLocaleString()}</strong> playlists fetched${s.errors?` &middot; ${s.errors} errors`:''}`;
+        b.innerHTML=`<span class="spinner"></span>Loading data: day <strong>${s.days_done||0}/${s.days_total||'?'}</strong> &middot; ${s.current_station||''} ${s.station_progress||''} &middot; <strong>${(s.playlists_fetched||0).toLocaleString()}</strong> playlists fetched${s.errors?` &middot; ${s.errors} errors`:''}`;
       }else if(s.phase==='tagging'){
         b.innerHTML=`<span class="spinner"></span>Tagging artists: <strong>${s.artists_tagged||0}/${s.artists_total||'?'}</strong>`;
       }

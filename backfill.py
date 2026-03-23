@@ -77,7 +77,7 @@ def backfill():
 
                 print(f"[backfill] {target_date} {station}: {len(to_fetch)} new playlists", flush=True)
 
-                for entry in to_fetch:
+                for j, entry in enumerate(to_fetch):
                     write_status({
                         "running": True,
                         "phase": "playlists",
@@ -85,6 +85,7 @@ def backfill():
                         "days_total": BACKFILL_DAYS,
                         "current_date": str(target_date),
                         "current_station": station,
+                        "station_progress": f"{j+1}/{len(to_fetch)}",
                         "playlists_fetched": total_fetched,
                         "errors": total_errors,
                         "started_at": datetime.fromtimestamp(start_time).isoformat(),

@@ -56,8 +56,21 @@ MIGRATIONS = [
 ]
 
 
+def _seed_db_if_needed():
+    """Copy bundled DB into data dir on first run."""
+    if DB_PATH.exists():
+        return
+    bundled = Path(__file__).parent / "kalx.db"
+    if bundled.exists():
+        import shutil
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(bundled, DB_PATH)
+        print(f"[db] Seeded database from bundled kalx.db ({bundled.stat().st_size // 1024 // 1024}MB)", flush=True)
+
+
 def get_connection():
     """Get a database connection, creating tables if needed."""
+    _seed_db_if_needed()
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH), timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")

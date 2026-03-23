@@ -20,73 +20,73 @@ HTML = r"""
 <title>Radio Playlist Search</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#1a1230;color:#e8e0f0;min-height:100vh}
-header{background:#2b2054;border-bottom:2px solid #e07830;padding:.8rem 1.2rem;display:flex;align-items:center;justify-content:space-between}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#241848;color:#e8e0f0;min-height:100vh}
+header{background:#332060;border-bottom:2px solid #e060a0;padding:.8rem 1.2rem;display:flex;align-items:center;justify-content:space-between}
 header h1{font-size:1.2rem;font-weight:700;letter-spacing:-.02em;color:#f5f0f8}
-header h1 span{color:#e07830}
+header h1 span{color:#e060a0}
 .filter-toggle{display:none;background:none;border:1px solid #5c3d7a;color:#c8a0c8;padding:.4rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer}
-.filter-toggle:hover{border-color:#e07830;color:#e07830}
+.filter-toggle:hover{border-color:#e060a0;color:#e060a0}
 
 /* Layout */
 .app{display:flex;min-height:calc(100vh - 52px)}
-.sidebar{width:220px;flex-shrink:0;background:#221840;border-right:1px solid #3a2860;padding:1rem;overflow-y:auto;max-height:calc(100vh - 52px);position:sticky;top:0}
+.sidebar{width:220px;flex-shrink:0;background:#2d1a50;border-right:1px solid #4a3870;padding:1rem;overflow-y:auto;max-height:calc(100vh - 52px);position:sticky;top:0}
 .main{flex:1;min-width:0;padding:1rem 1.5rem}
 
 /* Sidebar filter panels */
 .filter-section{margin-bottom:1.2rem}
-.filter-title{font-size:.7rem;color:#8a70a0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;font-weight:600}
+.filter-title{font-size:.7rem;color:#9a80b0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;font-weight:600}
 .filter-list{display:flex;flex-direction:column;gap:.15rem;max-height:200px;overflow-y:auto}
 .filter-list.short{max-height:none}
 .filter-item{display:flex;align-items:center;gap:.4rem;padding:.2rem .3rem;border-radius:3px;cursor:pointer;font-size:.8rem;color:#a090b8;user-select:none}
-.filter-item:hover{background:#2b2054;color:#e8e0f0}
-.filter-item input{accent-color:#e07830;margin:0;cursor:pointer}
+.filter-item:hover{background:#332060;color:#e8e0f0}
+.filter-item input{accent-color:#e060a0;margin:0;cursor:pointer}
 .filter-item.checked{color:#e8e0f0}
-.filter-count{color:#6a5080;font-size:.7rem;margin-left:auto}
-.genre-search{width:100%;background:#1a1230;border:1px solid #3a2860;border-radius:3px;color:#c8a0c8;padding:.3rem .5rem;font-size:.78rem;margin-bottom:.4rem}
-.genre-search:focus{outline:none;border-color:#e07830}
+.filter-count{color:#7a6090;font-size:.7rem;margin-left:auto}
+.genre-search{width:100%;background:#241848;border:1px solid #4a3870;border-radius:3px;color:#c8a0c8;padding:.3rem .5rem;font-size:.78rem;margin-bottom:.4rem}
+.genre-search:focus{outline:none;border-color:#e060a0}
 
 /* Search bar */
 .search-bar{display:flex;gap:.5rem;margin-bottom:1rem;align-items:stretch}
-.search-bar input{flex:1;background:#2b2054;border:1px solid #4a2d6b;border-radius:6px;color:#e8e0f0;padding:.5rem .8rem;font-size:.9rem;min-width:0}
-.search-bar input:focus{outline:none;border-color:#e07830}
+.search-bar input{flex:1;background:#332060;border:1px solid #5a3d7a;border-radius:6px;color:#e8e0f0;padding:.5rem .8rem;font-size:.9rem;min-width:0}
+.search-bar input:focus{outline:none;border-color:#e060a0}
 .search-bar input::placeholder{color:#7a6090}
-.search-bar select{background:#2b2054;border:1px solid #4a2d6b;border-radius:6px;color:#e8e0f0;padding:.5rem;font-size:.82rem}
-.search-bar button{background:#e07830;color:#fff;border:none;border-radius:6px;padding:.5rem 1rem;font-size:.9rem;font-weight:600;cursor:pointer;white-space:nowrap}
-.search-bar button:hover{background:#c86820}
-.search-bar button:disabled{background:#4a2d6b;cursor:wait;color:#8a70a0}
+.search-bar select{background:#332060;border:1px solid #5a3d7a;border-radius:6px;color:#e8e0f0;padding:.5rem;font-size:.82rem}
+.search-bar button{background:#e060a0;color:#fff;border:none;border-radius:6px;padding:.5rem 1rem;font-size:.9rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.search-bar button:hover{background:#c84888}
+.search-bar button:disabled{background:#5a3d7a;cursor:wait;color:#9a80b0}
 
 /* Tabs */
 .tabs{display:flex;gap:0;margin-bottom:1rem}
-.tab{padding:.45rem 1rem;background:#2b2054;border:1px solid #4a2d6b;color:#8a70a0;cursor:pointer;font-size:.8rem;font-weight:500}
+.tab{padding:.45rem 1rem;background:#332060;border:1px solid #5a3d7a;color:#9a80b0;cursor:pointer;font-size:.8rem;font-weight:500}
 .tab:first-child{border-radius:5px 0 0 5px}
 .tab:last-child{border-radius:0 5px 5px 0}
-.tab.active{background:#e07830;color:#fff;border-color:#e07830}
+.tab.active{background:#e060a0;color:#fff;border-color:#e060a0}
 
 /* Content */
-.status{color:#8a70a0;font-size:.85rem;padding:.6rem 0}
+.status{color:#9a80b0;font-size:.85rem;padding:.6rem 0}
 .status.error{color:#e88080}
-.empty{color:#6a5080;padding:2rem;text-align:center}
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid #4a2d6b;border-top-color:#e07830;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:.4rem}
+.empty{color:#7a6090;padding:2rem;text-align:center}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #5a3d7a;border-top-color:#e060a0;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:.4rem}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* Table */
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;font-size:.82rem}
-th{text-align:left;padding:.45rem .6rem;border-bottom:2px solid #3a2860;color:#8a70a0;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+th{text-align:left;padding:.45rem .6rem;border-bottom:2px solid #4a3870;color:#9a80b0;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
 td{padding:.45rem .6rem;border-bottom:1px solid #2b2054;white-space:nowrap}
 td.wrap{white-space:normal}
-tr:hover td{background:#2b2054}
-.artist-name{color:#e07830;font-weight:500}
+tr:hover td{background:#332060}
+.artist-name{color:#e060a0;font-weight:500}
 .song-name{color:#e8e0f0}
 .meta{color:#7a6090}
-.dj-name{color:#d85090}
-.playlist-link{color:#d85090;text-decoration:none;cursor:pointer}
+.dj-name{color:#c8a0c8}
+.playlist-link{color:#c8a0c8;text-decoration:none;cursor:pointer}
 .playlist-link:hover{text-decoration:underline;color:#e8b8c8}
-.rank{color:#e07830;font-weight:700;text-align:right}
+.rank{color:#e060a0;font-weight:700;text-align:right}
 .plays{font-variant-numeric:tabular-nums}
 .station-tags{display:flex;gap:.2rem;flex-wrap:wrap}
-.station-tag{font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:#2b2054;color:#a090b8;border:1px solid #3a2860}
-.back-link{color:#d85090;cursor:pointer;font-size:.85rem;margin-bottom:.8rem;display:inline-block}
+.station-tag{font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:#332060;color:#a090b8;border:1px solid #4a3870}
+.back-link{color:#c8a0c8;cursor:pointer;font-size:.85rem;margin-bottom:.8rem;display:inline-block}
 .back-link:hover{text-decoration:underline;color:#e8b8c8}
 .playlist-header{margin-bottom:.8rem}
 .playlist-header h2{font-size:1.1rem;margin-bottom:.2rem;color:#f5f0f8}
@@ -97,15 +97,15 @@ tr:hover td{background:#2b2054}
 .music-links a{font-size:.6rem;padding:.1rem .3rem;border-radius:3px;text-decoration:none;font-weight:600;opacity:.5;transition:opacity .15s}
 .music-links a:hover{opacity:1}
 .ml-sp{background:#1db954;color:#fff}
-.ml-am{background:#d85090;color:#fff}
+.ml-am{background:#c8a0c8;color:#fff}
 .ml-bc{background:#1da0c3;color:#fff}
-.ml-ti{background:#2b2054;color:#c8a0c8;border:1px solid #5c3d7a}
+.ml-ti{background:#332060;color:#c8a0c8;border:1px solid #5c3d7a}
 
 /* Mobile */
 @media(max-width:768px){
   .filter-toggle{display:block}
   .app{flex-direction:column}
-  .sidebar{width:100%;max-height:none;position:static;border-right:none;border-bottom:1px solid #3a2860;padding:.8rem;display:none}
+  .sidebar{width:100%;max-height:none;position:static;border-right:none;border-bottom:1px solid #4a3870;padding:.8rem;display:none}
   .sidebar.open{display:block}
   .sidebar .filter-panels{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
   .main{padding:.8rem}

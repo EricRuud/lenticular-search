@@ -169,6 +169,43 @@ def backfill():
     print(f"[backfill] Done in {elapsed}s. {stats['playlists']} playlists, {stats['spins']} spins", flush=True)
 
 
+def refresh_today():
+    """Quick refresh — fetch just today and yesterday for all stations."""
+    conn = get_connection()
+    today = datetime.now().date()
+    yesterday = today - timedelta(days=1)
+
+    for target_date in [today, yesterday]:
+        for station in DEFAULT_STATIONS:
+            try:
+                if station in SPINITRON_STATIONS:
+                    entries = get_playlist_ids_for_range(target_date, target_date, station)
+                    fetch_fn = lambda pid, st=station: fetch_playlist(pid, st)
+                elif station == "BFF.fm":
+                    import bff
+                    entries = bff.get_playlist_ids_for_range(target_date, target_date)
+                    fetch_fn = bff.fetch_playlist
+                else:
+                    continue
+
+                existing = get_stored_playlist_ids(conn, target_date, target_date, station)
+                to_fetch = [e for e in entries if e["id"] not in existing]
+                for entry in to_fetch:
+                    try:
+                        playlist = fetch_fn(entry["id"])
+                        if playlist:
+                            store_playlist(conn, playlist)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+    conn.close()
+
+
+UPDATE_INTERVAL = 30 * 60  # 30 minutes
+
+
 if __name__ == "__main__":
     print("[backfill] Starting background data backfill...", flush=True)
     try:
@@ -176,3 +213,21 @@ if __name__ == "__main__":
     except Exception:
         traceback.print_exc()
         write_status({"running": False, "phase": "error", "error": traceback.format_exc()})
+
+    # Keep running — refresh new data every 30 minutes
+    print(f"[backfill] Entering refresh loop (every {UPDATE_INTERVAL // 60} min)...", flush=True)
+    while True:
+        time.sleep(UPDATE_INTERVAL)
+        try:
+            print("[backfill] Refreshing today's data...", flush=True)
+            refresh_today()
+            stats = get_db_stats(get_connection())
+            print(f"[backfill] Refresh done. {stats['playlists']} playlists, {stats['spins']} spins", flush=True)
+            write_status({
+                "running": False,
+                "phase": "idle",
+                "last_refresh": datetime.now().isoformat(),
+                "next_refresh": (datetime.now() + timedelta(seconds=UPDATE_INTERVAL)).isoformat(),
+            })
+        except Exception as exc:
+            print(f"[backfill] Refresh error: {exc}", flush=True)

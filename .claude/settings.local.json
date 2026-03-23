@@ -6,7 +6,11 @@
       "Edit",
       "WebFetch(domain:widgets.spinitron.com)",
       "WebFetch(domain:bff.fm)",
-      "WebFetch(domain:developer.bff.fm)"
+      "WebFetch(domain:developer.bff.fm)",
+      "WebSearch",
+      "WebFetch(domain:thelenticularclouds.bandcamp.com)",
+      "WebFetch(domain:f4.bcbits.com)",
+      "WebFetch(domain:www.ifitstooloud.com)"
     ]
   }
 }

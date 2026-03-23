@@ -26,6 +26,10 @@ header h1{font-size:1.2rem;font-weight:700;letter-spacing:-.02em;color:#f5f0f8}
 header h1 span{color:#e060a0}
 .filter-toggle{display:none;background:none;border:1px solid #5c3d7a;color:#c8a0c8;padding:.4rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer}
 .filter-toggle:hover{border-color:#e060a0;color:#e060a0}
+.backfill-banner{background:#332060;border-bottom:1px solid #5a3d7a;padding:.5rem 1.2rem;font-size:.78rem;color:#c8a0c8;display:flex;align-items:center;gap:.5rem}
+.backfill-banner .spinner{width:12px;height:12px;border-width:2px}
+.backfill-banner strong{color:#e060a0}
+.backfill-banner.done{background:#2d1a50;color:#7a6090}
 
 /* Layout */
 .app{display:flex;min-height:calc(100vh - 52px)}
@@ -124,6 +128,7 @@ tr:hover td{background:#332060}
   <h1><span>Radio</span> Playlist Search</h1>
   <button class="filter-toggle" onclick="toggleSidebar()">Filters</button>
 </header>
+<div class="backfill-banner" id="backfillBanner" style="display:none"></div>
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <div class="filter-panels">
@@ -228,6 +233,35 @@ $('#genreSearch').addEventListener('input',e=>{
   const filtered=(window._allGenres||[]).filter(t=>t.tag.includes(q));
   renderGenres(filtered);
 });
+
+// Backfill status polling
+function checkBackfill(){
+  fetch('/api/backfill-status').then(r=>r.json()).then(s=>{
+    const b=$('#backfillBanner');
+    if(s.running){
+      b.style.display='flex';
+      b.className='backfill-banner';
+      if(s.phase==='playlists'){
+        b.innerHTML=`<span class="spinner"></span>Loading data: day <strong>${s.days_done||0}/${s.days_total||'?'}</strong> &middot; ${s.current_station||''} &middot; <strong>${(s.playlists_fetched||0).toLocaleString()}</strong> playlists fetched${s.errors?` &middot; ${s.errors} errors`:''}`;
+      }else if(s.phase==='tagging'){
+        b.innerHTML=`<span class="spinner"></span>Tagging artists: <strong>${s.artists_tagged||0}/${s.artists_total||'?'}</strong>`;
+      }
+      setTimeout(checkBackfill,5000);
+    }else if(s.phase==='done'){
+      b.style.display='flex';
+      b.className='backfill-banner done';
+      b.innerHTML=`Data loaded: <strong>${(s.playlists_fetched||0).toLocaleString()}</strong> playlists in ${Math.round((s.elapsed_seconds||0)/60)}min`;
+      setTimeout(()=>{b.style.display='none'},15000);
+    }else if(s.phase==='error'){
+      b.style.display='flex';
+      b.className='backfill-banner';
+      b.innerHTML=`<span style="color:#e88080">Backfill error</span>`;
+    }else{
+      b.style.display='none';
+    }
+  }).catch(()=>{});
+}
+checkBackfill();
 
 // Tabs
 $$('.tab').forEach(t=>t.addEventListener('click',()=>{
@@ -455,6 +489,15 @@ def api_stats():
     stats = get_db_stats(conn)
     conn.close()
     return jsonify(stats)
+
+
+@app.route("/api/backfill-status")
+def api_backfill_status():
+    from db import DB_PATH
+    status_file = DB_PATH.parent / "backfill_status.json"
+    if status_file.exists():
+        return jsonify(json.loads(status_file.read_text()))
+    return jsonify({"running": False, "phase": "unknown"})
 
 
 @app.route("/api/recent")

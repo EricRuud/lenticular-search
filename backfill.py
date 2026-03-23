@@ -2,14 +2,20 @@
 """Background backfill — iterates day-by-day (today backwards), station-by-station.
 
 Starts the web server immediately; data appears as it's ingested.
+Writes status to a JSON file so the web UI can display progress.
 """
 
+import json
 import sys
 import time
 import traceback
 from datetime import datetime, timedelta
+from pathlib import Path
 
-from db import get_connection, get_db_stats, store_playlist, get_stored_playlist_ids
+from db import (
+    DB_PATH, get_connection, get_db_stats, store_playlist,
+    get_stored_playlist_ids, get_untagged_artists, store_artist_tags,
+)
 from kalx import (
     DEFAULT_STATIONS, SPINITRON_STATIONS,
     get_playlist_ids_for_range, fetch_playlist,
@@ -17,6 +23,13 @@ from kalx import (
 
 BACKFILL_DAYS = 30
 TAG_LIMIT = 200
+STATUS_FILE = DB_PATH.parent / "backfill_status.json"
+
+
+def write_status(status):
+    """Write current backfill status to a JSON file."""
+    STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    STATUS_FILE.write_text(json.dumps(status))
 
 
 def backfill():
@@ -25,13 +38,27 @@ def backfill():
     print(f"[backfill] DB: {stats['playlists']} playlists, {stats['spins']} spins", flush=True)
 
     today = datetime.now().date()
+    total_fetched = 0
+    total_errors = 0
+    start_time = time.time()
+
+    write_status({
+        "running": True,
+        "phase": "playlists",
+        "days_done": 0,
+        "days_total": BACKFILL_DAYS,
+        "current_date": str(today),
+        "current_station": "",
+        "playlists_fetched": 0,
+        "errors": 0,
+        "started_at": datetime.now().isoformat(),
+    })
 
     for days_ago in range(BACKFILL_DAYS):
         target_date = today - timedelta(days=days_ago)
 
         for station in DEFAULT_STATIONS:
             try:
-                # Get playlist IDs for this single day + station
                 if station in SPINITRON_STATIONS:
                     entries = get_playlist_ids_for_range(target_date, target_date, station)
                     fetch_fn = lambda pid, st=station: fetch_playlist(pid, st)
@@ -42,7 +69,6 @@ def backfill():
                 else:
                     continue
 
-                # Skip already-stored playlists
                 existing = get_stored_playlist_ids(conn, target_date, target_date, station)
                 to_fetch = [e for e in entries if e["id"] not in existing]
 
@@ -52,30 +78,51 @@ def backfill():
                 print(f"[backfill] {target_date} {station}: {len(to_fetch)} new playlists", flush=True)
 
                 for entry in to_fetch:
+                    write_status({
+                        "running": True,
+                        "phase": "playlists",
+                        "days_done": days_ago,
+                        "days_total": BACKFILL_DAYS,
+                        "current_date": str(target_date),
+                        "current_station": station,
+                        "playlists_fetched": total_fetched,
+                        "errors": total_errors,
+                        "started_at": datetime.fromtimestamp(start_time).isoformat(),
+                        "elapsed_seconds": int(time.time() - start_time),
+                    })
                     try:
                         playlist = fetch_fn(entry["id"])
                         if playlist:
                             store_playlist(conn, playlist)
+                            total_fetched += 1
                     except Exception:
-                        pass  # skip individual failures
+                        total_errors += 1
 
             except Exception as exc:
+                total_errors += 1
                 print(f"[backfill] {target_date} {station}: error - {exc}", flush=True)
                 time.sleep(2)
 
-        if days_ago % 5 == 0 and days_ago > 0:
+        if days_ago % 5 == 0:
             stats = get_db_stats(conn)
-            print(f"[backfill] Progress: {stats['playlists']} playlists, {stats['spins']} spins", flush=True)
+            print(f"[backfill] Day {days_ago}/{BACKFILL_DAYS}: {stats['playlists']} playlists, {stats['spins']} spins", flush=True)
 
-    # Tag artists after data is loaded
+    # Tag artists
     print("[backfill] Tagging artists...", flush=True)
-    try:
-        from db import get_untagged_artists, store_artist_tags
-        import requests
+    write_status({
+        "running": True,
+        "phase": "tagging",
+        "playlists_fetched": total_fetched,
+        "errors": total_errors,
+        "started_at": datetime.fromtimestamp(start_time).isoformat(),
+        "elapsed_seconds": int(time.time() - start_time),
+    })
 
+    try:
+        import requests
         untagged = get_untagged_artists(conn, limit=TAG_LIMIT)
         tagged = 0
-        for artist, _ in untagged:
+        for i, (artist, _) in enumerate(untagged):
             try:
                 time.sleep(1.1)
                 resp = requests.get(
@@ -94,13 +141,32 @@ def backfill():
                             tagged += 1
             except Exception:
                 pass
+            if (i + 1) % 25 == 0:
+                write_status({
+                    "running": True,
+                    "phase": "tagging",
+                    "artists_tagged": tagged,
+                    "artists_total": len(untagged),
+                    "playlists_fetched": total_fetched,
+                    "started_at": datetime.fromtimestamp(start_time).isoformat(),
+                    "elapsed_seconds": int(time.time() - start_time),
+                })
         print(f"[backfill] Tagged {tagged} artists", flush=True)
     except Exception as exc:
         print(f"[backfill] Tagging error: {exc}", flush=True)
 
     stats = get_db_stats(conn)
     conn.close()
-    print(f"[backfill] Done. {stats['playlists']} playlists, {stats['spins']} spins", flush=True)
+    elapsed = int(time.time() - start_time)
+    write_status({
+        "running": False,
+        "phase": "done",
+        "playlists_fetched": total_fetched,
+        "errors": total_errors,
+        "elapsed_seconds": elapsed,
+        "finished_at": datetime.now().isoformat(),
+    })
+    print(f"[backfill] Done in {elapsed}s. {stats['playlists']} playlists, {stats['spins']} spins", flush=True)
 
 
 if __name__ == "__main__":
@@ -109,3 +175,4 @@ if __name__ == "__main__":
         backfill()
     except Exception:
         traceback.print_exc()
+        write_status({"running": False, "phase": "error", "error": traceback.format_exc()})

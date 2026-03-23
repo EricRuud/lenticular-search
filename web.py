@@ -310,8 +310,8 @@ function renderResults(data,artist,days){
         <td>${r.date||''}</td><td>${s.time}</td>
         <td class="dj-name">${esc(r.dj_name)}</td>
         <td><a class="playlist-link" onclick="loadPlaylist(${r.playlist_id})">${esc(r.show_name)}</a></td>
-        <td class="artist-name">${esc(s.artist)}${mlinks(s.artist,s.song)}</td>
-        <td class="song-name">${esc(s.song)}</td>
+        <td class="artist-name">${esc(s.artist)}</td>
+        <td class="song-name">${esc(s.song)}${mlinks(s.artist,s.song)}</td>
         <td class="meta wrap">${esc(s.album)}</td></tr>`;
     }
   }

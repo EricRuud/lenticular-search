@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Write",
+      "Edit",
+      "WebFetch(domain:widgets.spinitron.com)",
+      "WebFetch(domain:bff.fm)",
+      "WebFetch(domain:developer.bff.fm)"
+    ]
+  }
+}

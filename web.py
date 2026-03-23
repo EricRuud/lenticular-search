@@ -91,6 +91,15 @@ tr:hover td{background:#161616}
 .playlist-header h2{font-size:1.1rem;margin-bottom:.2rem}
 .playlist-header .details{color:#888;font-size:.85rem}
 
+/* Music links */
+.music-links{display:inline-flex;gap:.25rem;margin-left:.4rem;vertical-align:middle}
+.music-links a{font-size:.6rem;padding:.1rem .3rem;border-radius:3px;text-decoration:none;font-weight:600;opacity:.5;transition:opacity .15s}
+.music-links a:hover{opacity:1}
+.ml-sp{background:#1db954;color:#fff}
+.ml-am{background:#fc3c44;color:#fff}
+.ml-bc{background:#1da0c3;color:#fff}
+.ml-ti{background:#000;color:#fff;border:1px solid #333}
+
 /* Mobile */
 @media(max-width:768px){
   .filter-toggle{display:block}
@@ -266,7 +275,7 @@ function renderResults(data,artist,days){
         <td>${r.date||''}</td><td>${s.time}</td>
         <td class="dj-name">${esc(r.dj_name)}</td>
         <td><a class="playlist-link" onclick="loadPlaylist(${r.playlist_id})">${esc(r.show_name)}</a></td>
-        <td class="artist-name">${esc(s.artist)}</td>
+        <td class="artist-name">${esc(s.artist)}${mlinks(s.artist,s.song)}</td>
         <td class="song-name">${esc(s.song)}</td>
         <td class="meta wrap">${esc(s.album)}</td></tr>`;
     }
@@ -305,8 +314,8 @@ async function loadLeaderboard(){
     if(!data.length){$('#content').innerHTML='<div class="empty">No data for these filters</div>';return}
     let html='<div class="table-wrap"><table><thead><tr><th>#</th><th>Artist</th><th>Plays</th><th>Shows</th><th>Stations</th></tr></thead><tbody>';
     data.forEach((a,i)=>{
-      html+=`<tr style="cursor:pointer" onclick="searchArtist('${esc(a.artist).replace(/'/g,"\\'")}')">
-        <td class="rank">${i+1}</td><td class="artist-name">${esc(a.artist)}</td>
+      html+=`<tr style="cursor:pointer" onclick="searchArtist('${esc(a.artist).replace(/'/g,"\\'")}',event)">
+        <td class="rank">${i+1}</td><td class="artist-name">${esc(a.artist)}${mlinks(a.artist)}</td>
         <td class="plays">${a.plays}</td><td class="plays">${a.shows}</td>
         <td><div class="station-tags">${a.stations.map(s=>`<span class="station-tag">${esc(s)}</span>`).join('')}</div></td></tr>`;
     });
@@ -315,7 +324,8 @@ async function loadLeaderboard(){
   }catch(err){$('#content').innerHTML=`<div class="status error">Error: ${err.message}</div>`}
 }
 
-function searchArtist(name){
+function searchArtist(name,e){
+  if(e&&e.target.closest('.music-links')) return;
   $('#artist').value=name;
   $$('.tab').forEach(t=>t.classList.remove('active'));
   $$('.tab')[0].classList.add('active');
@@ -336,7 +346,7 @@ async function loadPlaylist(id){
     else{
       html+='<div class="table-wrap"><table><thead><tr><th>Time</th><th>Artist</th><th>Song</th><th>Album</th><th>Label</th></tr></thead><tbody>';
       for(const s of data.spins){
-        html+=`<tr><td>${s.time}</td><td class="artist-name">${esc(s.artist)}</td>
+        html+=`<tr><td>${s.time}</td><td class="artist-name">${esc(s.artist)}${mlinks(s.artist,s.song)}</td>
           <td class="song-name">${esc(s.song)}</td><td class="meta wrap">${esc(s.album)}</td>
           <td class="meta">${esc(s.label)}</td></tr>`;
       }
@@ -353,6 +363,15 @@ function goBack(){
 }
 
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+function mlinks(artist,song){
+  const q=encodeURIComponent(song?artist+' '+song:artist);
+  return `<span class="music-links">`
+    +`<a href="https://open.spotify.com/search/${q}" target="_blank" rel="noopener" class="ml-sp" title="Spotify">SP</a>`
+    +`<a href="https://music.apple.com/us/search?term=${q}" target="_blank" rel="noopener" class="ml-am" title="Apple Music">AM</a>`
+    +`<a href="https://bandcamp.com/search?q=${q}" target="_blank" rel="noopener" class="ml-bc" title="Bandcamp">BC</a>`
+    +`<a href="https://tidal.com/search?q=${q}" target="_blank" rel="noopener" class="ml-ti" title="Tidal">TI</a>`
+    +`</span>`;
+}
 
 $('#content').innerHTML='<div class="empty">Search for an artist above</div>';
 </script>

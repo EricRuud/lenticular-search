@@ -1,0 +1,492 @@
+#!/usr/bin/env python3
+"""Web UI for the KALX playlist scraper."""
+
+import json
+from datetime import datetime, timedelta
+
+from flask import Flask, jsonify, render_template_string, request
+
+from db import get_connection, get_all_tags, get_db_stats, get_playlist_from_db, get_top_artists, search_db
+from kalx import fetch, fetch_playlist, SPINITRON_BASE, STATIONS
+
+app = Flask(__name__)
+
+HTML = r"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Playlist Search</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#e0e0e0;min-height:100vh}
+header{background:#111;border-bottom:2px solid #ff4400;padding:.8rem 1.2rem;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:1.2rem;font-weight:700;letter-spacing:-.02em}
+header h1 span{color:#ff4400}
+.filter-toggle{display:none;background:none;border:1px solid #333;color:#ccc;padding:.4rem .8rem;border-radius:4px;font-size:.8rem;cursor:pointer}
+.filter-toggle:hover{border-color:#ff4400;color:#ff4400}
+
+/* Layout */
+.app{display:flex;min-height:calc(100vh - 52px)}
+.sidebar{width:220px;flex-shrink:0;background:#111;border-right:1px solid #1a1a1a;padding:1rem;overflow-y:auto;max-height:calc(100vh - 52px);position:sticky;top:0}
+.main{flex:1;min-width:0;padding:1rem 1.5rem}
+
+/* Sidebar filter panels */
+.filter-section{margin-bottom:1.2rem}
+.filter-title{font-size:.7rem;color:#666;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;font-weight:600}
+.filter-list{display:flex;flex-direction:column;gap:.15rem;max-height:200px;overflow-y:auto}
+.filter-list.short{max-height:none}
+.filter-item{display:flex;align-items:center;gap:.4rem;padding:.2rem .3rem;border-radius:3px;cursor:pointer;font-size:.8rem;color:#aaa;user-select:none}
+.filter-item:hover{background:#1a1a1a;color:#e0e0e0}
+.filter-item input{accent-color:#ff4400;margin:0;cursor:pointer}
+.filter-item.checked{color:#e0e0e0}
+.filter-count{color:#555;font-size:.7rem;margin-left:auto}
+.genre-search{width:100%;background:#0a0a0a;border:1px solid #222;border-radius:3px;color:#ccc;padding:.3rem .5rem;font-size:.78rem;margin-bottom:.4rem}
+.genre-search:focus{outline:none;border-color:#ff4400}
+
+/* Search bar */
+.search-bar{display:flex;gap:.5rem;margin-bottom:1rem;align-items:stretch}
+.search-bar input{flex:1;background:#161616;border:1px solid #2a2a2a;border-radius:6px;color:#e0e0e0;padding:.5rem .8rem;font-size:.9rem;min-width:0}
+.search-bar input:focus{outline:none;border-color:#ff4400}
+.search-bar select{background:#161616;border:1px solid #2a2a2a;border-radius:6px;color:#e0e0e0;padding:.5rem;font-size:.82rem}
+.search-bar button{background:#ff4400;color:#fff;border:none;border-radius:6px;padding:.5rem 1rem;font-size:.9rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.search-bar button:hover{background:#e63d00}
+.search-bar button:disabled{background:#444;cursor:wait}
+
+/* Tabs */
+.tabs{display:flex;gap:0;margin-bottom:1rem}
+.tab{padding:.45rem 1rem;background:#161616;border:1px solid #2a2a2a;color:#888;cursor:pointer;font-size:.8rem;font-weight:500}
+.tab:first-child{border-radius:5px 0 0 5px}
+.tab:last-child{border-radius:0 5px 5px 0}
+.tab.active{background:#ff4400;color:#fff;border-color:#ff4400}
+
+/* Content */
+.status{color:#888;font-size:.85rem;padding:.6rem 0}
+.status.error{color:#ff6666}
+.empty{color:#666;padding:2rem;text-align:center}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #444;border-top-color:#ff4400;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:.4rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Table */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{text-align:left;padding:.45rem .6rem;border-bottom:2px solid #2a2a2a;color:#888;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+td{padding:.45rem .6rem;border-bottom:1px solid #1a1a1a;white-space:nowrap}
+td.wrap{white-space:normal}
+tr:hover td{background:#161616}
+.artist-name{color:#ff4400;font-weight:500}
+.song-name{color:#e0e0e0}
+.meta{color:#666}
+.dj-name{color:#88aaff}
+.playlist-link{color:#88aaff;text-decoration:none;cursor:pointer}
+.playlist-link:hover{text-decoration:underline}
+.rank{color:#ff4400;font-weight:700;text-align:right}
+.plays{font-variant-numeric:tabular-nums}
+.station-tags{display:flex;gap:.2rem;flex-wrap:wrap}
+.station-tag{font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:#1a1a1a;color:#999;border:1px solid #2a2a2a}
+.back-link{color:#88aaff;cursor:pointer;font-size:.85rem;margin-bottom:.8rem;display:inline-block}
+.back-link:hover{text-decoration:underline}
+.playlist-header{margin-bottom:.8rem}
+.playlist-header h2{font-size:1.1rem;margin-bottom:.2rem}
+.playlist-header .details{color:#888;font-size:.85rem}
+
+/* Mobile */
+@media(max-width:768px){
+  .filter-toggle{display:block}
+  .app{flex-direction:column}
+  .sidebar{width:100%;max-height:none;position:static;border-right:none;border-bottom:1px solid #1a1a1a;padding:.8rem;display:none}
+  .sidebar.open{display:block}
+  .sidebar .filter-panels{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+  .main{padding:.8rem}
+  .search-bar{flex-wrap:wrap}
+  .search-bar input{min-width:100%}
+  td{font-size:.75rem;padding:.35rem .4rem}
+}
+@media(max-width:480px){
+  .sidebar .filter-panels{grid-template-columns:1fr}
+  header h1{font-size:1rem}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Radio</span> Playlist Search</h1>
+  <button class="filter-toggle" onclick="toggleSidebar()">Filters</button>
+</header>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="filter-panels">
+      <div class="filter-section">
+        <div class="filter-title">Stations</div>
+        <div class="filter-list short" id="stationFilters"></div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-title">Time Range</div>
+        <div class="filter-list short" id="rangeFilters">
+          <label class="filter-item"><input type="radio" name="range" value="1"> 24 hours</label>
+          <label class="filter-item"><input type="radio" name="range" value="3"> 3 days</label>
+          <label class="filter-item checked"><input type="radio" name="range" value="7" checked> 7 days</label>
+          <label class="filter-item"><input type="radio" name="range" value="14"> 2 weeks</label>
+          <label class="filter-item"><input type="radio" name="range" value="30"> 30 days</label>
+          <label class="filter-item"><input type="radio" name="range" value="90"> 3 months</label>
+          <label class="filter-item"><input type="radio" name="range" value="180"> 6 months</label>
+        </div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-title">Genres</div>
+        <input type="text" class="genre-search" id="genreSearch" placeholder="Filter genres...">
+        <div class="filter-list" id="genreFilters"></div>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <form id="searchForm" class="search-bar">
+      <input type="text" id="artist" placeholder="Search for an artist..." autofocus>
+      <button type="submit" id="searchBtn">Search</button>
+    </form>
+    <div class="tabs">
+      <div class="tab active" data-tab="results">Search</div>
+      <div class="tab" data-tab="leaderboard">Top Artists</div>
+      <div class="tab" data-tab="recent">Recent</div>
+    </div>
+    <div id="content"></div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const $$=s=>document.querySelectorAll(s);
+let currentTab='results';
+
+function toggleSidebar(){$('#sidebar').classList.toggle('open')}
+
+function getSelectedStations(){
+  return [...$$('#stationFilters input:checked')].map(c=>c.value);
+}
+function getSelectedGenres(){
+  return [...$$('#genreFilters input:checked')].map(c=>c.value);
+}
+function getDays(){
+  const r=$('input[name="range"]:checked');
+  return r?r.value:'7';
+}
+
+// Highlight checked filter items
+document.addEventListener('change',e=>{
+  if(e.target.closest('.filter-item')){
+    const item=e.target.closest('.filter-item');
+    if(e.target.type==='checkbox') item.classList.toggle('checked',e.target.checked);
+    if(e.target.type==='radio'){
+      item.closest('.filter-list').querySelectorAll('.filter-item').forEach(fi=>fi.classList.remove('checked'));
+      item.classList.add('checked');
+    }
+    if(currentTab==='leaderboard') loadLeaderboard();
+  }
+});
+
+// Load stations
+fetch('/api/stats').then(r=>r.json()).then(data=>{
+  const el=$('#stationFilters');
+  (data.stations||[]).forEach(s=>{
+    const item=document.createElement('label');
+    item.className='filter-item checked';
+    item.innerHTML=`<input type="checkbox" value="${s}" checked> ${s}`;
+    el.appendChild(item);
+  });
+});
+
+// Load genres
+fetch('/api/tags').then(r=>r.json()).then(data=>{
+  window._allGenres=data;
+  renderGenres(data);
+});
+function renderGenres(tags){
+  const el=$('#genreFilters');
+  const prev=getSelectedGenres();
+  el.innerHTML='';
+  tags.slice(0,80).forEach(t=>{
+    const checked=prev.includes(t.tag);
+    const item=document.createElement('label');
+    item.className='filter-item'+(checked?' checked':'');
+    item.innerHTML=`<input type="checkbox" value="${t.tag}"${checked?' checked':''}> ${t.tag} <span class="filter-count">${t.count}</span>`;
+    el.appendChild(item);
+  });
+}
+$('#genreSearch').addEventListener('input',e=>{
+  const q=e.target.value.toLowerCase();
+  const filtered=(window._allGenres||[]).filter(t=>t.tag.includes(q));
+  renderGenres(filtered);
+});
+
+// Tabs
+$$('.tab').forEach(t=>t.addEventListener('click',()=>{
+  $$('.tab').forEach(t2=>t2.classList.remove('active'));
+  t.classList.add('active');
+  currentTab=t.dataset.tab;
+  if(currentTab==='recent') loadRecent();
+  else if(currentTab==='leaderboard') loadLeaderboard();
+  else $('#content').innerHTML='<div class="empty">Search for an artist above</div>';
+}));
+
+// Search
+$('#searchForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const artist=$('#artist').value.trim();
+  if(!artist) return;
+  const days=getDays();
+  const stations=getSelectedStations();
+  $('#searchBtn').disabled=true;
+  $('#content').innerHTML='<div class="status"><span class="spinner"></span>Searching...</div>';
+  try{
+    let url=`/api/search?artist=${encodeURIComponent(artist)}&days=${days}`;
+    if(stations.length) url+=stations.map(s=>`&station=${s}`).join('');
+    const resp=await fetch(url);
+    const data=await resp.json();
+    if(data.error) throw new Error(data.error);
+    renderResults(data,artist,days);
+  }catch(err){
+    $('#content').innerHTML=`<div class="status error">Error: ${err.message}</div>`;
+  }
+  $('#searchBtn').disabled=false;
+});
+
+function renderResults(data,artist,days){
+  if(!data.results.length){
+    $('#content').innerHTML=`<div class="empty">No plays found for "${esc(artist)}"</div>`;
+    return;
+  }
+  const total=data.results.reduce((n,r)=>n+r.spins.length,0);
+  let html=`<div class="status">Found ${total} play${total!==1?'s':''} across ${data.results.length} show${data.results.length!==1?'s':''}</div>`;
+  html+='<div class="table-wrap"><table><thead><tr><th>Station</th><th>Date</th><th>Time</th><th>DJ</th><th>Show</th><th>Artist</th><th>Song</th><th>Album</th></tr></thead><tbody>';
+  for(const r of data.results){
+    for(const s of r.spins){
+      html+=`<tr>
+        <td><strong>${esc(r.station||'')}</strong></td>
+        <td>${r.date||''}</td><td>${s.time}</td>
+        <td class="dj-name">${esc(r.dj_name)}</td>
+        <td><a class="playlist-link" onclick="loadPlaylist(${r.playlist_id})">${esc(r.show_name)}</a></td>
+        <td class="artist-name">${esc(s.artist)}</td>
+        <td class="song-name">${esc(s.song)}</td>
+        <td class="meta wrap">${esc(s.album)}</td></tr>`;
+    }
+  }
+  html+='</tbody></table></div>';
+  $('#content').innerHTML=html;
+}
+
+async function loadRecent(){
+  $('#content').innerHTML='<div class="status"><span class="spinner"></span>Loading...</div>';
+  try{
+    const resp=await fetch('/api/recent');
+    const data=await resp.json();
+    let html='<div class="table-wrap"><table><thead><tr><th>Station</th><th>Time</th><th>Show</th><th>DJ</th></tr></thead><tbody>';
+    for(const r of data){
+      html+=`<tr><td><strong>${esc(r.station||'')}</strong></td><td>${r.time}</td>
+        <td><a class="playlist-link" onclick="loadPlaylist(${r.id})">${esc(r.show)}</a></td>
+        <td class="dj-name">${esc(r.dj)}</td></tr>`;
+    }
+    html+='</tbody></table></div>';
+    $('#content').innerHTML=html;
+  }catch(err){$('#content').innerHTML=`<div class="status error">Error: ${err.message}</div>`}
+}
+
+async function loadLeaderboard(){
+  const days=getDays();
+  const stations=getSelectedStations();
+  const genres=getSelectedGenres();
+  $('#content').innerHTML='<div class="status"><span class="spinner"></span>Loading top artists...</div>';
+  try{
+    let url=`/api/top-artists?days=${days}`;
+    if(stations.length) url+=stations.map(s=>`&station=${s}`).join('');
+    if(genres.length) url+=genres.map(g=>`&tag=${encodeURIComponent(g)}`).join('');
+    const resp=await fetch(url);
+    const data=await resp.json();
+    if(!data.length){$('#content').innerHTML='<div class="empty">No data for these filters</div>';return}
+    let html='<div class="table-wrap"><table><thead><tr><th>#</th><th>Artist</th><th>Plays</th><th>Shows</th><th>Stations</th></tr></thead><tbody>';
+    data.forEach((a,i)=>{
+      html+=`<tr style="cursor:pointer" onclick="searchArtist('${esc(a.artist).replace(/'/g,"\\'")}')">
+        <td class="rank">${i+1}</td><td class="artist-name">${esc(a.artist)}</td>
+        <td class="plays">${a.plays}</td><td class="plays">${a.shows}</td>
+        <td><div class="station-tags">${a.stations.map(s=>`<span class="station-tag">${esc(s)}</span>`).join('')}</div></td></tr>`;
+    });
+    html+='</tbody></table></div>';
+    $('#content').innerHTML=html;
+  }catch(err){$('#content').innerHTML=`<div class="status error">Error: ${err.message}</div>`}
+}
+
+function searchArtist(name){
+  $('#artist').value=name;
+  $$('.tab').forEach(t=>t.classList.remove('active'));
+  $$('.tab')[0].classList.add('active');
+  currentTab='results';
+  $('#searchForm').dispatchEvent(new Event('submit'));
+}
+
+async function loadPlaylist(id){
+  $('#content').innerHTML='<div class="status"><span class="spinner"></span>Loading playlist...</div>';
+  try{
+    const resp=await fetch(`/api/playlist/${id}`);
+    const data=await resp.json();
+    if(data.error) throw new Error(data.error);
+    let html=`<div class="back-link" onclick="goBack()">&larr; Back</div>`;
+    html+=`<div class="playlist-header"><h2>${esc(data.show_name)}</h2>`;
+    html+=`<div class="details"><span class="dj-name">${esc(data.dj_name)}</span> &middot; ${esc(data.date_str)}</div></div>`;
+    if(!data.spins.length){html+='<div class="empty">No spins logged</div>'}
+    else{
+      html+='<div class="table-wrap"><table><thead><tr><th>Time</th><th>Artist</th><th>Song</th><th>Album</th><th>Label</th></tr></thead><tbody>';
+      for(const s of data.spins){
+        html+=`<tr><td>${s.time}</td><td class="artist-name">${esc(s.artist)}</td>
+          <td class="song-name">${esc(s.song)}</td><td class="meta wrap">${esc(s.album)}</td>
+          <td class="meta">${esc(s.label)}</td></tr>`;
+      }
+      html+='</tbody></table></div>';
+    }
+    $('#content').innerHTML=html;
+  }catch(err){$('#content').innerHTML=`<div class="status error">Error: ${err.message}</div>`}
+}
+
+function goBack(){
+  if(currentTab==='recent') loadRecent();
+  else if(currentTab==='leaderboard') loadLeaderboard();
+  else $('#content').innerHTML='<div class="empty">Search for an artist above</div>';
+}
+
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+
+$('#content').innerHTML='<div class="empty">Search for an artist above</div>';
+</script>
+</body>
+</html>
+"""
+
+
+@app.route("/")
+def index():
+    return render_template_string(HTML)
+
+
+@app.route("/api/search")
+def api_search():
+    artist = request.args.get("artist", "").strip()
+    days = int(request.args.get("days", 7))
+    stations_list = [s for s in request.args.getlist("station") if s.strip()]
+    if not artist:
+        return jsonify({"error": "No artist specified"}), 400
+
+    start_date = (datetime.now() - timedelta(days=days)).date()
+    end_date = datetime.now().date()
+    stations = stations_list or None
+
+    conn = get_connection()
+    results = search_db(conn, artist, start_date, end_date, stations=stations)
+    conn.close()
+
+    return jsonify({
+        "results": [
+            {
+                "playlist_id": r["playlist_id"],
+                "station": r.get("station", "KALX"),
+                "show_name": r["show_name"],
+                "dj_name": r["dj_name"],
+                "date": r["date"].strftime("%a %m/%d") if r["date"] else "",
+                "spins": r["spins"],
+            }
+            for r in results
+        ],
+    })
+
+
+@app.route("/api/top-artists")
+def api_top_artists():
+    days = int(request.args.get("days", 7))
+    stations_list = [s for s in request.args.getlist("station") if s.strip()]
+    tags_list = [t for t in request.args.getlist("tag") if t.strip()]
+    limit = int(request.args.get("limit", 50))
+
+    start_date = (datetime.now() - timedelta(days=days)).date()
+    end_date = datetime.now().date()
+    stations = stations_list or None
+
+    conn = get_connection()
+    results = get_top_artists(conn, start_date, end_date, stations=stations, tags=tags_list or None, limit=limit)
+    conn.close()
+    return jsonify(results)
+
+
+@app.route("/api/tags")
+def api_tags():
+    conn = get_connection()
+    tags = get_all_tags(conn)
+    conn.close()
+    return jsonify(tags)
+
+
+@app.route("/api/stats")
+def api_stats():
+    conn = get_connection()
+    stats = get_db_stats(conn)
+    conn.close()
+    return jsonify(stats)
+
+
+@app.route("/api/recent")
+def api_recent():
+    from bs4 import BeautifulSoup
+    import re
+
+    conn = get_connection()
+    db_stations = get_db_stats(conn)["stations"]
+    conn.close()
+
+    items = []
+    for station in (db_stations or ["KALX"]):
+        html = fetch(f"{SPINITRON_BASE}/{station}/")
+        if not html:
+            continue
+        soup = BeautifulSoup(html, "html.parser")
+        recent = soup.find("div", class_="recent-playlists")
+        if not recent:
+            continue
+        for row in recent.find_all("tr"):
+            time_cell = row.find("td", class_="show-time")
+            pl_link = row.find("a", href=re.compile(rf"/{station}/pl/\d+"))
+            if not pl_link:
+                continue
+            match = re.search(r"/\w+/pl/(\d+)", pl_link["href"])
+            dj_link = row.find("a", href=re.compile(rf"/{station}/dj/"))
+            items.append({
+                "station": station,
+                "time": time_cell.get_text(strip=True) if time_cell else "",
+                "show": pl_link.get_text(strip=True),
+                "id": int(match.group(1)) if match else 0,
+                "dj": dj_link.get_text(strip=True) if dj_link else "",
+            })
+    return jsonify(items)
+
+
+@app.route("/api/playlist/<int:playlist_id>")
+def api_playlist(playlist_id):
+    conn = get_connection()
+    playlist = get_playlist_from_db(conn, playlist_id)
+    conn.close()
+
+    if not playlist:
+        playlist = fetch_playlist(playlist_id)
+
+    if not playlist:
+        return jsonify({"error": "Playlist not found"}), 404
+    return jsonify({
+        "show_name": playlist["show_name"],
+        "dj_name": playlist["dj_name"],
+        "date_str": playlist["date_str"],
+        "spins": playlist["spins"],
+    })
+
+
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    debug = not os.environ.get("RENDER")
+    print(f"Starting Radio Playlist Search at http://localhost:{port}")
+    app.run(debug=debug, host="0.0.0.0", port=port)

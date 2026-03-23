@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: radio-playlist-search
+    runtime: python
+    buildCommand: bash build.sh
+    startCommand: gunicorn web:app --bind 0.0.0.0:$PORT --workers 2 --timeout 600
+    envVars:
+      - key: RENDER
+        value: "1"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+    disk:
+      name: kalx-data
+      mountPath: /opt/render/project/.cache
+      sizeGB: 1

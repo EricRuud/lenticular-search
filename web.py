@@ -374,7 +374,14 @@ function mlinks(artist,song){
     +`</span>`;
 }
 
-$('#content').innerHTML='<div class="empty">Search for an artist above</div>';
+// Show DB status on load
+fetch('/api/stats').then(r=>r.json()).then(data=>{
+  if(!data.playlists){
+    $('#content').innerHTML='<div class="empty">Data is loading in the background. Refresh in a minute.</div>';
+  } else {
+    $('#content').innerHTML=`<div class="empty">Search for an artist above<br><span style="font-size:.75rem;color:#7a6090">${data.playlists.toLocaleString()} playlists &middot; ${data.spins.toLocaleString()} spins &middot; ${(data.stations||[]).length} stations</span></div>`;
+  }
+});
 </script>
 </body>
 </html>

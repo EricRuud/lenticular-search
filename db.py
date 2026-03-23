@@ -5,9 +5,14 @@ import sqlite3
 from datetime import date, datetime
 from pathlib import Path
 
-# Use Render's persistent disk if available, else ~/.cache/kalx/
-if os.environ.get("RENDER"):
-    DB_PATH = Path("/opt/render/project/.cache/kalx/kalx.db")
+# Use Render's persistent disk if mounted, else local data dir, else ~/.cache/kalx/
+_render_disk = Path("/opt/render/project/.cache/kalx")
+_local_data = Path(__file__).parent / "data"
+
+if os.environ.get("RENDER") and _render_disk.parent.exists():
+    DB_PATH = _render_disk / "kalx.db"
+elif os.environ.get("RENDER"):
+    DB_PATH = _local_data / "kalx.db"
 else:
     DB_PATH = Path.home() / ".cache" / "kalx" / "kalx.db"
 
@@ -58,17 +63,21 @@ MIGRATIONS = [
 
 def _seed_db_if_needed():
     """Decompress bundled DB into data dir on first run."""
+    print(f"[db] DB_PATH={DB_PATH}, exists={DB_PATH.exists()}", flush=True)
     if DB_PATH.exists():
         return
     bundled_gz = Path(__file__).parent / "kalx.db.gz"
+    print(f"[db] bundled_gz={bundled_gz}, exists={bundled_gz.exists()}", flush=True)
     if bundled_gz.exists():
         import gzip
         import shutil
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        print(f"[db] Decompressing bundled database...", flush=True)
+        print(f"[db] Decompressing bundled database to {DB_PATH}...", flush=True)
         with gzip.open(bundled_gz, "rb") as f_in, open(DB_PATH, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
         print(f"[db] Seeded database ({DB_PATH.stat().st_size // 1024 // 1024}MB)", flush=True)
+    else:
+        print(f"[db] No bundled database found, starting fresh", flush=True)
 
 
 def get_connection():

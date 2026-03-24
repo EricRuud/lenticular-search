@@ -72,12 +72,22 @@ def _seed_db_if_needed():
     """Decompress bundled DB into data dir on first run."""
     print(f"[db] DB_PATH={DB_PATH}, exists={DB_PATH.exists()}", flush=True)
     if DB_PATH.exists():
-        # Check if the existing DB has data — if not, replace it
-        size = DB_PATH.stat().st_size
-        if size > 100_000:  # >100KB means it has real data
+        # Check if the DB has location data — if not, replace with newer bundled version
+        try:
+            import sqlite3
+            c = sqlite3.connect(str(DB_PATH))
+            tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            if "artist_locations" in tables:
+                loc_count = c.execute("SELECT COUNT(*) FROM artist_locations").fetchone()[0]
+            else:
+                loc_count = 0
+            c.close()
+            if loc_count > 50:
+                return
+            print(f"[db] Existing DB has only {loc_count} locations — replacing with bundled data", flush=True)
+            DB_PATH.unlink()
+        except Exception:
             return
-        print(f"[db] Existing DB is only {size} bytes — replacing with bundled data", flush=True)
-        DB_PATH.unlink()
     bundled_gz = Path(__file__).parent / "kalx.db.gz"
     print(f"[db] bundled_gz={bundled_gz}, exists={bundled_gz.exists()}", flush=True)
     if bundled_gz.exists():

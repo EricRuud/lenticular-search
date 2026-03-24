@@ -320,6 +320,7 @@ def store_artist_tags(conn, artist, tags):
 
 
 BAY_AREA_LOCATIONS = {
+    # Core cities
     "san francisco", "oakland", "berkeley", "richmond", "san jose",
     "palo alto", "mountain view", "sunnyvale", "santa clara", "fremont",
     "hayward", "concord", "walnut creek", "san mateo", "redwood city",
@@ -328,11 +329,20 @@ BAY_AREA_LOCATIONS = {
     "santa rosa", "novato", "mill valley", "sausalito", "san leandro",
     "pleasanton", "livermore", "cupertino", "menlo park", "half moon bay",
     "pacifica", "south san francisco", "burlingame", "foster city",
-    "san bruno", "stockton", "modesto",
-    # Broader matches
+    "san bruno", "stockton", "modesto", "antioch", "pittsburg",
+    "el sobrante", "pinole", "hercules", "martinez", "benicia",
+    "napa", "sonoma", "gilroy", "morgan hill", "los gatos", "campbell",
+    "milpitas", "newark", "union city", "san pablo", "orinda",
+    "lafayette", "moraga", "danville", "dublin", "san ramon",
+    "woodside", "portola valley", "atherton", "los altos", "los altos hills",
+    "belmont", "san carlos", "millbrae", "corte madera", "larkspur",
+    "tiburon", "fairfax", "san anselmo", "ross", "kentfield",
+    "sebastopol", "cotati", "rohnert park", "windsor",
+    "alameda", "piedmont", "kensington",
+    # Regional names
     "bay area", "san francisco bay area", "east bay", "south bay",
     "north bay", "peninsula", "silicon valley",
-    "california",  # broad but catches some
+    "sf", "the bay",
 }
 
 

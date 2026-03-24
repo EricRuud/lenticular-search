@@ -17,7 +17,7 @@ HTML = r"""
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Radio Playlist Search</title>
+<title>Bay Area Radio Play Log</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#241848;color:#e8e0f0;min-height:100vh}
@@ -106,35 +106,40 @@ tr:hover td{background:#332060}
 .playlist-header .details{color:#a090b8;font-size:.85rem}
 
 /* Music links */
-.music-links{display:inline-flex;gap:.25rem;margin-left:.4rem;vertical-align:middle}
-.music-links a{font-size:.6rem;padding:.1rem .3rem;border-radius:3px;text-decoration:none;font-weight:600;opacity:.5;transition:opacity .15s}
-.music-links a:hover{opacity:1}
-.ml-sp{background:#1db954;color:#fff}
-.ml-am{background:#c8a0c8;color:#fff}
-.ml-bc{background:#1da0c3;color:#fff}
-.ml-ti{background:#332060;color:#c8a0c8;border:1px solid #5c3d7a}
+.music-links{display:inline;margin-left:.4rem;font-size:.7rem;color:#7a6090}
+.music-links a{color:#9a80b0;text-decoration:none;transition:color .15s}
+.music-links a:hover{color:#e060a0;text-decoration:underline}
+.music-links .sep{color:#5a3d7a}
 
 /* Mobile */
 @media(max-width:768px){
   .filter-toggle{display:block}
   .app{flex-direction:column}
-  .sidebar{width:100%;max-height:none;position:static;border-right:none;border-bottom:1px solid #4a3870;padding:.8rem;display:none}
+  .sidebar{width:100%;max-height:60vh;overflow-y:auto;position:static;border-right:none;border-bottom:1px solid #4a3870;padding:.8rem;display:none}
   .sidebar.open{display:block}
   .sidebar .filter-panels{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
   .main{padding:.8rem}
   .search-bar{flex-wrap:wrap}
-  .search-bar input{min-width:100%}
-  td{font-size:.75rem;padding:.35rem .4rem}
+  .search-bar input{min-width:100%;font-size:16px}
+  .search-bar button{width:100%}
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tab{padding:.5rem .8rem;flex-shrink:0}
+  td{font-size:.75rem;padding:.4rem}
+  .filter-item{padding:.35rem .3rem}
+  .music-links{display:block;margin-left:0;margin-top:.2rem}
+  .hide-mobile{display:none}
 }
 @media(max-width:480px){
   .sidebar .filter-panels{grid-template-columns:1fr}
-  header h1{font-size:1rem}
+  header h1{font-size:.95rem}
+  header{padding:.6rem .8rem}
+  .main{padding:.5rem}
 }
 </style>
 </head>
 <body>
 <header>
-  <h1><span>Radio</span> Playlist Search</h1>
+  <h1><span>Bay Area</span> Radio Play Log</h1>
   <button class="filter-toggle" onclick="toggleSidebar()">Filters</button>
 </header>
 <div class="backfill-banner" id="backfillBanner" style="display:none"></div>
@@ -176,8 +181,8 @@ tr:hover td{background:#332060}
       <button type="submit" id="searchBtn">Search</button>
     </form>
     <div class="tabs">
-      <div class="tab active" data-tab="results">Search</div>
-      <div class="tab" data-tab="leaderboard">Top Artists</div>
+      <div class="tab" data-tab="results">Search</div>
+      <div class="tab active" data-tab="leaderboard">Top Artists</div>
       <div class="tab" data-tab="recent">Recent</div>
     </div>
     <div id="content"></div>
@@ -187,7 +192,7 @@ tr:hover td{background:#332060}
 <script>
 const $=s=>document.querySelector(s);
 const $$=s=>document.querySelectorAll(s);
-let currentTab='results';
+let currentTab='leaderboard';
 
 function toggleSidebar(){$('#sidebar').classList.toggle('open')}
 
@@ -287,6 +292,7 @@ $$('.tab').forEach(t=>t.addEventListener('click',()=>{
   if(currentTab==='recent') loadRecent();
   else if(currentTab==='leaderboard') loadLeaderboard();
   else $('#content').innerHTML='<div class="empty">Search for an artist above</div>';
+  if(window.innerWidth<=768) $('#sidebar').classList.remove('open');
 }));
 
 // Search
@@ -319,17 +325,17 @@ function renderResults(data,artist,days){
   }
   const total=data.results.reduce((n,r)=>n+r.spins.length,0);
   let html=`<div class="status">Found ${total} play${total!==1?'s':''} across ${data.results.length} show${data.results.length!==1?'s':''}</div>`;
-  html+='<div class="table-wrap"><table><thead><tr><th>Station</th><th>Date</th><th>Time</th><th>DJ</th><th>Show</th><th>Artist</th><th>Song</th><th>Album</th></tr></thead><tbody>';
+  html+='<div class="table-wrap"><table><thead><tr><th>Station</th><th>Date</th><th>Time</th><th class="hide-mobile">DJ</th><th class="hide-mobile">Show</th><th>Artist</th><th>Song</th><th class="hide-mobile">Album</th></tr></thead><tbody>';
   for(const r of data.results){
     for(const s of r.spins){
       html+=`<tr>
         <td><strong>${esc(r.station||'')}</strong></td>
         <td>${r.date||''}</td><td>${s.time}</td>
-        <td class="dj-name">${esc(r.dj_name)}</td>
-        <td><a class="playlist-link" onclick="loadPlaylist(${r.playlist_id})">${esc(r.show_name)}</a></td>
+        <td class="dj-name hide-mobile">${esc(r.dj_name)}</td>
+        <td class="hide-mobile"><a class="playlist-link" onclick="loadPlaylist(${r.playlist_id})">${esc(r.show_name)}</a></td>
         <td class="artist-name">${esc(s.artist)}${loc(s.local)}</td>
         <td class="song-name">${esc(s.song)}${mlinks(s.artist,s.song)}</td>
-        <td class="meta wrap">${esc(s.album)}</td></tr>`;
+        <td class="meta wrap hide-mobile">${esc(s.album)}</td></tr>`;
     }
   }
   html+='</tbody></table></div>';
@@ -420,19 +426,22 @@ function loc(isLocal){return isLocal?'<span class="local-badge">BAY AREA</span>'
 function mlinks(artist,song){
   const q=encodeURIComponent(song?artist+' '+song:artist);
   return `<span class="music-links">`
-    +`<a href="https://open.spotify.com/search/${q}" target="_blank" rel="noopener" class="ml-sp" title="Spotify">SP</a>`
-    +`<a href="https://music.apple.com/us/search?term=${q}" target="_blank" rel="noopener" class="ml-am" title="Apple Music">AM</a>`
-    +`<a href="https://bandcamp.com/search?q=${q}" target="_blank" rel="noopener" class="ml-bc" title="Bandcamp">BC</a>`
-    +`<a href="https://tidal.com/search?q=${q}" target="_blank" rel="noopener" class="ml-ti" title="Tidal">TI</a>`
+    +`<a href="https://open.spotify.com/search/${q}" target="_blank" rel="noopener">spotify</a>`
+    +`<span class="sep"> · </span>`
+    +`<a href="https://music.apple.com/us/search?term=${q}" target="_blank" rel="noopener">apple</a>`
+    +`<span class="sep"> · </span>`
+    +`<a href="https://bandcamp.com/search?q=${q}" target="_blank" rel="noopener">bandcamp</a>`
+    +`<span class="sep"> · </span>`
+    +`<a href="https://tidal.com/search?q=${q}" target="_blank" rel="noopener">tidal</a>`
     +`</span>`;
 }
 
-// Show DB status on load
+// Load leaderboard on startup
 fetch('/api/stats').then(r=>r.json()).then(data=>{
   if(!data.playlists){
     $('#content').innerHTML='<div class="empty">Data is loading in the background. Refresh in a minute.</div>';
   } else {
-    $('#content').innerHTML=`<div class="empty">Search for an artist above<br><span style="font-size:.75rem;color:#7a6090">${data.playlists.toLocaleString()} playlists &middot; ${data.spins.toLocaleString()} spins &middot; ${(data.stations||[]).length} stations</span></div>`;
+    loadLeaderboard();
   }
 });
 </script>
@@ -579,5 +588,5 @@ if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5000))
     debug = not os.environ.get("RENDER")
-    print(f"Starting Radio Playlist Search at http://localhost:{port}")
+    print(f"Starting Bay Area Radio Play Log at http://localhost:{port}")
     app.run(debug=debug, host="0.0.0.0", port=port)

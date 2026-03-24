@@ -15,6 +15,7 @@ from pathlib import Path
 from db import (
     DB_PATH, get_connection, get_db_stats, store_playlist,
     get_stored_playlist_ids, get_untagged_artists, store_artist_tags,
+    get_unlocated_artists, store_artist_location,
 )
 from kalx import (
     DEFAULT_STATIONS, SPINITRON_STATIONS,
@@ -120,26 +121,18 @@ def backfill():
     })
 
     try:
-        import requests
+        from kalx import _fetch_musicbrainz_artist
+
+        # Tag genres + locations together
         untagged = get_untagged_artists(conn, limit=TAG_LIMIT)
         tagged = 0
         for i, (artist, _) in enumerate(untagged):
             try:
-                time.sleep(1.1)
-                resp = requests.get(
-                    "https://musicbrainz.org/ws/2/artist/",
-                    params={"query": f'artist:"{artist}"', "fmt": "json", "limit": "1"},
-                    headers={"User-Agent": "RadioPlaylistSearch/1.0 (genre-tagging)"},
-                    timeout=10,
-                )
-                if resp.ok:
-                    data = resp.json()
-                    if data.get("artists"):
-                        tags = [(t["name"].lower(), t.get("count", 0))
-                                for t in data["artists"][0].get("tags", [])]
-                        if tags:
-                            store_artist_tags(conn, artist, tags)
-                            tagged += 1
+                tags, area, begin_area = _fetch_musicbrainz_artist(artist)
+                if tags:
+                    store_artist_tags(conn, artist, tags)
+                    tagged += 1
+                store_artist_location(conn, artist, area, begin_area)
             except Exception:
                 pass
             if (i + 1) % 25 == 0:
@@ -152,7 +145,18 @@ def backfill():
                     "started_at": datetime.fromtimestamp(start_time).isoformat(),
                     "elapsed_seconds": int(time.time() - start_time),
                 })
-        print(f"[backfill] Tagged {tagged} artists", flush=True)
+
+        # Fill in locations for previously tagged artists
+        unlocated = get_unlocated_artists(conn, limit=TAG_LIMIT)
+        for artist, _ in unlocated:
+            try:
+                _, area, begin_area = _fetch_musicbrainz_artist(artist)
+                store_artist_location(conn, artist, area, begin_area)
+            except Exception:
+                pass
+
+        local_count = conn.execute("SELECT COUNT(*) FROM artist_locations WHERE is_local=1").fetchone()[0]
+        print(f"[backfill] Tagged {tagged} artists, {local_count} local", flush=True)
     except Exception as exc:
         print(f"[backfill] Tagging error: {exc}", flush=True)
 

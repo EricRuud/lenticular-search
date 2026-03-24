@@ -406,44 +406,68 @@ def cmd_build_db(args):
           f"({stats['min_date']} to {stats['max_date']})")
 
 
+def _fetch_musicbrainz_artist(artist):
+    """Fetch artist data from MusicBrainz. Returns (tags, area, begin_area)."""
+    time.sleep(1.1)  # MusicBrainz rate limit: 1 req/sec
+    resp = requests.get(
+        "https://musicbrainz.org/ws/2/artist/",
+        params={"query": f'artist:"{artist}"', "fmt": "json", "limit": "1"},
+        headers={"User-Agent": "RadioPlaylistSearch/1.0 (genre-tagging)"},
+        timeout=10,
+    )
+    if not resp.ok:
+        return None, "", ""
+    data = resp.json()
+    if not data.get("artists"):
+        return None, "", ""
+    mb = data["artists"][0]
+    tags = [(t["name"].lower(), t.get("count", 0)) for t in mb.get("tags", [])]
+    area = mb.get("area", {}).get("name", "")
+    begin_area = mb.get("begin-area", {}).get("name", "")
+    return tags, area, begin_area
+
+
 def cmd_tag_artists(args):
-    """Fetch genre tags from MusicBrainz for untagged artists."""
-    from db import get_connection, get_untagged_artists, store_artist_tags
+    """Fetch genre tags and locations from MusicBrainz for untagged artists."""
+    from db import (get_connection, get_untagged_artists, store_artist_tags,
+                    get_unlocated_artists, store_artist_location)
 
     conn = get_connection()
-    untagged = get_untagged_artists(conn, limit=args.limit)
-    print(f"Found {len(untagged)} untagged artists (by play count).")
 
+    # Tag genres
+    untagged = get_untagged_artists(conn, limit=args.limit)
+    print(f"Found {len(untagged)} untagged artists.")
     tagged = 0
     errors = 0
-    for i, (artist, play_count) in enumerate(untagged):
+    for i, (artist, _) in enumerate(untagged):
         try:
-            time.sleep(1.1)  # MusicBrainz rate limit: 1 req/sec
-            resp = requests.get(
-                "https://musicbrainz.org/ws/2/artist/",
-                params={"query": f'artist:"{artist}"', "fmt": "json", "limit": "1"},
-                headers={"User-Agent": "RadioPlaylistSearch/1.0 (genre-tagging)"},
-                timeout=10,
-            )
-            if resp.ok:
-                data = resp.json()
-                if data.get("artists"):
-                    mb_artist = data["artists"][0]
-                    tags = [
-                        (t["name"].lower(), t.get("count", 0))
-                        for t in mb_artist.get("tags", [])
-                    ]
-                    if tags:
-                        store_artist_tags(conn, artist, tags)
-                        tagged += 1
+            tags, area, begin_area = _fetch_musicbrainz_artist(artist)
+            if tags:
+                store_artist_tags(conn, artist, tags)
+                tagged += 1
+            store_artist_location(conn, artist, area, begin_area)
         except Exception:
             errors += 1
-
         if (i + 1) % 25 == 0 or (i + 1) == len(untagged):
-            print(f"  {i + 1}/{len(untagged)} checked, {tagged} tagged, {errors} errors")
+            print(f"  Tags: {i + 1}/{len(untagged)} checked, {tagged} tagged, {errors} errors")
 
+    # Fill in locations for artists that got tagged previously but have no location
+    unlocated = get_unlocated_artists(conn, limit=args.limit)
+    print(f"Found {len(unlocated)} artists without location data.")
+    located = 0
+    for i, (artist, _) in enumerate(unlocated):
+        try:
+            _, area, begin_area = _fetch_musicbrainz_artist(artist)
+            store_artist_location(conn, artist, area, begin_area)
+            located += 1
+        except Exception:
+            pass
+        if (i + 1) % 25 == 0 or (i + 1) == len(unlocated):
+            print(f"  Locations: {i + 1}/{len(unlocated)} checked")
+
+    local_count = conn.execute("SELECT COUNT(*) FROM artist_locations WHERE is_local=1").fetchone()[0]
     conn.close()
-    print(f"Done. Tagged {tagged} artists.")
+    print(f"Done. Tagged {tagged} artists, located {located}. {local_count} local Bay Area artists.")
 
 
 def cmd_playlist(args):

@@ -51,6 +51,13 @@ CREATE TABLE IF NOT EXISTS artist_tags (
 
 CREATE INDEX IF NOT EXISTS idx_artist_tags_tag ON artist_tags(tag COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_artist_tags_artist ON artist_tags(artist COLLATE NOCASE);
+
+CREATE TABLE IF NOT EXISTS artist_locations (
+    artist        TEXT PRIMARY KEY COLLATE NOCASE,
+    area          TEXT NOT NULL DEFAULT '',
+    begin_area    TEXT NOT NULL DEFAULT '',
+    is_local      INTEGER NOT NULL DEFAULT 0
+);
 """
 
 MIGRATIONS = [
@@ -153,9 +160,11 @@ def search_db(conn, query, start_date, end_date, stations=None):
         placeholders = ",".join("?" for _ in stations)
         sql = f"""
             SELECT p.playlist_id, p.show_name, p.dj_name, p.date_str, p.show_date,
-                   s.spin_time, s.artist, s.song, s.album, s.label, p.station
+                   s.spin_time, s.artist, s.song, s.album, s.label, p.station,
+                   COALESCE(al.is_local, 0)
             FROM spins s
             JOIN playlists p ON s.playlist_id = p.playlist_id
+            LEFT JOIN artist_locations al ON s.artist = al.artist COLLATE NOCASE
             WHERE s.artist LIKE ? ESCAPE '\\'
               AND p.show_date BETWEEN ? AND ?
               AND p.station IN ({placeholders})
@@ -165,9 +174,11 @@ def search_db(conn, query, start_date, end_date, stations=None):
     else:
         sql = """
             SELECT p.playlist_id, p.show_name, p.dj_name, p.date_str, p.show_date,
-                   s.spin_time, s.artist, s.song, s.album, s.label, p.station
+                   s.spin_time, s.artist, s.song, s.album, s.label, p.station,
+                   COALESCE(al.is_local, 0)
             FROM spins s
             JOIN playlists p ON s.playlist_id = p.playlist_id
+            LEFT JOIN artist_locations al ON s.artist = al.artist COLLATE NOCASE
             WHERE s.artist LIKE ? ESCAPE '\\'
               AND p.show_date BETWEEN ? AND ?
             ORDER BY p.show_date, s.spin_time
@@ -196,6 +207,7 @@ def search_db(conn, query, start_date, end_date, stations=None):
             "song": row[7],
             "album": row[8],
             "label": row[9],
+            "local": bool(row[11]),
         })
 
     return list(grouped.values())
@@ -275,9 +287,11 @@ def get_top_artists(conn, start_date, end_date, stations=None, tags=None, tag=No
         SELECT s.artist, COUNT(*) as play_count,
                COUNT(DISTINCT p.playlist_id) as show_count,
                COUNT(DISTINCT p.station) as station_count,
-               GROUP_CONCAT(DISTINCT p.station) as station_list
+               GROUP_CONCAT(DISTINCT p.station) as station_list,
+               COALESCE(al.is_local, 0) as is_local
         FROM spins s
         JOIN playlists p ON s.playlist_id = p.playlist_id
+        LEFT JOIN artist_locations al ON s.artist = al.artist COLLATE NOCASE
         {joins}
         WHERE {where}
         GROUP BY s.artist COLLATE NOCASE
@@ -292,6 +306,7 @@ def get_top_artists(conn, start_date, end_date, stations=None, tags=None, tag=No
             "plays": r[1],
             "shows": r[2],
             "stations": r[4].split(",") if r[4] else [],
+            "local": bool(r[5]),
         }
         for r in rows
     ]
@@ -305,6 +320,49 @@ def store_artist_tags(conn, artist, tags):
             (artist, tag_name, score),
         )
     conn.commit()
+
+
+BAY_AREA_LOCATIONS = {
+    "san francisco", "oakland", "berkeley", "richmond", "san jose",
+    "palo alto", "mountain view", "sunnyvale", "santa clara", "fremont",
+    "hayward", "concord", "walnut creek", "san mateo", "redwood city",
+    "daly city", "santa cruz", "sacramento", "davis", "albany",
+    "el cerrito", "emeryville", "san rafael", "vallejo", "petaluma",
+    "santa rosa", "novato", "mill valley", "sausalito", "san leandro",
+    "pleasanton", "livermore", "cupertino", "menlo park", "half moon bay",
+    "pacifica", "south san francisco", "burlingame", "foster city",
+    "san bruno", "stockton", "modesto",
+    # Broader matches
+    "bay area", "san francisco bay area", "east bay", "south bay",
+    "north bay", "peninsula", "silicon valley",
+    "california",  # broad but catches some
+}
+
+
+def store_artist_location(conn, artist, area, begin_area):
+    """Store artist location and determine if they're local."""
+    check = (area.lower().strip(), begin_area.lower().strip())
+    is_local = any(loc in BAY_AREA_LOCATIONS for loc in check if loc)
+    conn.execute(
+        "INSERT OR REPLACE INTO artist_locations (artist, area, begin_area, is_local) "
+        "VALUES (?, ?, ?, ?)",
+        (artist, area, begin_area, int(is_local)),
+    )
+    conn.commit()
+
+
+def get_unlocated_artists(conn, limit=500):
+    """Get artists that have no location data yet."""
+    rows = conn.execute("""
+        SELECT s.artist, COUNT(*) as play_count
+        FROM spins s
+        LEFT JOIN artist_locations al ON s.artist = al.artist COLLATE NOCASE
+        WHERE al.artist IS NULL AND s.artist != ''
+        GROUP BY s.artist COLLATE NOCASE
+        ORDER BY play_count DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    return [(r[0], r[1]) for r in rows]
 
 
 def get_untagged_artists(conn, limit=200):

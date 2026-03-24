@@ -90,6 +90,7 @@ tr:hover td{background:#332060}
 .plays{font-variant-numeric:tabular-nums}
 .station-tags{display:flex;gap:.2rem;flex-wrap:wrap}
 .station-tag{font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:#332060;color:#a090b8;border:1px solid #4a3870}
+.local-badge{display:inline-block;font-size:.6rem;padding:.1rem .35rem;border-radius:3px;background:#5a7a50;color:#c8e8c0;font-weight:600;margin-left:.35rem;vertical-align:middle;letter-spacing:.02em}
 .back-link{color:#c8a0c8;cursor:pointer;font-size:.85rem;margin-bottom:.8rem;display:inline-block}
 .back-link:hover{text-decoration:underline;color:#e8b8c8}
 .playlist-header{margin-bottom:.8rem}
@@ -310,7 +311,7 @@ function renderResults(data,artist,days){
         <td>${r.date||''}</td><td>${s.time}</td>
         <td class="dj-name">${esc(r.dj_name)}</td>
         <td><a class="playlist-link" onclick="loadPlaylist(${r.playlist_id})">${esc(r.show_name)}</a></td>
-        <td class="artist-name">${esc(s.artist)}</td>
+        <td class="artist-name">${esc(s.artist)}${loc(s.local)}</td>
         <td class="song-name">${esc(s.song)}${mlinks(s.artist,s.song)}</td>
         <td class="meta wrap">${esc(s.album)}</td></tr>`;
     }
@@ -350,7 +351,7 @@ async function loadLeaderboard(){
     let html='<div class="table-wrap"><table><thead><tr><th>#</th><th>Artist</th><th>Plays</th><th>Shows</th><th>Stations</th></tr></thead><tbody>';
     data.forEach((a,i)=>{
       html+=`<tr style="cursor:pointer" onclick="searchArtist('${esc(a.artist).replace(/'/g,"\\'")}',event)">
-        <td class="rank">${i+1}</td><td class="artist-name">${esc(a.artist)}${mlinks(a.artist)}</td>
+        <td class="rank">${i+1}</td><td class="artist-name">${esc(a.artist)}${loc(a.local)}${mlinks(a.artist)}</td>
         <td class="plays">${a.plays}</td><td class="plays">${a.shows}</td>
         <td><div class="station-tags">${a.stations.map(s=>`<span class="station-tag">${esc(s)}</span>`).join('')}</div></td></tr>`;
     });
@@ -398,6 +399,7 @@ function goBack(){
 }
 
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+function loc(isLocal){return isLocal?'<span class="local-badge">BAY AREA</span>':''}
 function mlinks(artist,song){
   const q=encodeURIComponent(song?artist+' '+song:artist);
   return `<span class="music-links">`

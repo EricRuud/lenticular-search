@@ -91,6 +91,14 @@ tr:hover td{background:#332060}
 .station-tags{display:flex;gap:.2rem;flex-wrap:wrap}
 .station-tag{font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:#332060;color:#a090b8;border:1px solid #4a3870}
 .local-badge{display:inline-block;font-size:.6rem;padding:.1rem .35rem;border-radius:3px;background:#5a7a50;color:#c8e8c0;font-weight:600;margin-left:.35rem;vertical-align:middle;letter-spacing:.02em}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:.3rem 0}
+.toggle-label{font-size:.8rem;color:#a090b8}
+.toggle{position:relative;width:36px;height:20px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:#5a3d7a;border-radius:10px;transition:background .2s}
+.toggle input:checked+.toggle-track{background:#5a7a50}
+.toggle-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;background:#e8e0f0;border-radius:50%;transition:transform .2s}
+.toggle input:checked~.toggle-knob{transform:translateX(16px)}
 .back-link{color:#c8a0c8;cursor:pointer;font-size:.85rem;margin-bottom:.8rem;display:inline-block}
 .back-link:hover{text-decoration:underline;color:#e8b8c8}
 .playlist-header{margin-bottom:.8rem}
@@ -136,6 +144,12 @@ tr:hover td{background:#332060}
       <div class="filter-section">
         <div class="filter-title">Stations</div>
         <div class="filter-list short" id="stationFilters"></div>
+      </div>
+      <div class="filter-section">
+        <div class="toggle-row">
+          <span class="toggle-label">Bay Area Local</span>
+          <label class="toggle"><input type="checkbox" id="localToggle"><span class="toggle-track"></span><span class="toggle-knob"></span></label>
+        </div>
       </div>
       <div class="filter-section">
         <div class="filter-title">Time Range</div>
@@ -199,6 +213,7 @@ document.addEventListener('change',e=>{
     }
     if(currentTab==='leaderboard') loadLeaderboard();
   }
+  if(e.target.id==='localToggle' && currentTab==='leaderboard') loadLeaderboard();
 });
 
 // Load stations
@@ -286,6 +301,7 @@ $('#searchForm').addEventListener('submit',async e=>{
   try{
     let url=`/api/search?artist=${encodeURIComponent(artist)}&days=${days}`;
     if(stations.length) url+=stations.map(s=>`&station=${s}`).join('');
+    if($('#localToggle').checked) url+='&local=1';
     const resp=await fetch(url);
     const data=await resp.json();
     if(data.error) throw new Error(data.error);
@@ -345,6 +361,7 @@ async function loadLeaderboard(){
     let url=`/api/top-artists?days=${days}`;
     if(stations.length) url+=stations.map(s=>`&station=${s}`).join('');
     if(genres.length) url+=genres.map(g=>`&tag=${encodeURIComponent(g)}`).join('');
+    if($('#localToggle').checked) url+='&local=1';
     const resp=await fetch(url);
     const data=await resp.json();
     if(!data.length){$('#content').innerHTML='<div class="empty">No data for these filters</div>';return}
@@ -434,6 +451,7 @@ def api_search():
     artist = request.args.get("artist", "").strip()
     days = int(request.args.get("days", 7))
     stations_list = [s for s in request.args.getlist("station") if s.strip()]
+    local_only = request.args.get("local") == "1"
     if not artist:
         return jsonify({"error": "No artist specified"}), 400
 
@@ -442,7 +460,7 @@ def api_search():
     stations = stations_list or None
 
     conn = get_connection()
-    results = search_db(conn, artist, start_date, end_date, stations=stations)
+    results = search_db(conn, artist, start_date, end_date, stations=stations, local_only=local_only)
     conn.close()
 
     return jsonify({
@@ -465,6 +483,7 @@ def api_top_artists():
     days = int(request.args.get("days", 7))
     stations_list = [s for s in request.args.getlist("station") if s.strip()]
     tags_list = [t for t in request.args.getlist("tag") if t.strip()]
+    local_only = request.args.get("local") == "1"
     limit = int(request.args.get("limit", 50))
 
     start_date = (datetime.now() - timedelta(days=days)).date()
@@ -472,7 +491,7 @@ def api_top_artists():
     stations = stations_list or None
 
     conn = get_connection()
-    results = get_top_artists(conn, start_date, end_date, stations=stations, tags=tags_list or None, limit=limit)
+    results = get_top_artists(conn, start_date, end_date, stations=stations, tags=tags_list or None, local_only=local_only, limit=limit)
     conn.close()
     return jsonify(results)
 

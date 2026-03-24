@@ -152,38 +152,32 @@ def _escape_like(s):
     return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def search_db(conn, query, start_date, end_date, stations=None):
+def search_db(conn, query, start_date, end_date, stations=None, local_only=False):
     """Search spins by artist substring match. Returns grouped results."""
     pattern = f"%{_escape_like(query)}%"
+    conditions = ["s.artist LIKE ? ESCAPE '\\\\'", "p.show_date BETWEEN ? AND ?"]
+    params = [pattern, start_date.isoformat(), end_date.isoformat()]
 
     if stations:
         placeholders = ",".join("?" for _ in stations)
-        sql = f"""
-            SELECT p.playlist_id, p.show_name, p.dj_name, p.date_str, p.show_date,
-                   s.spin_time, s.artist, s.song, s.album, s.label, p.station,
-                   COALESCE(al.is_local, 0)
-            FROM spins s
-            JOIN playlists p ON s.playlist_id = p.playlist_id
-            LEFT JOIN artist_locations al ON s.artist = al.artist COLLATE NOCASE
-            WHERE s.artist LIKE ? ESCAPE '\\'
-              AND p.show_date BETWEEN ? AND ?
-              AND p.station IN ({placeholders})
-            ORDER BY p.show_date, s.spin_time
-        """
-        params = [pattern, start_date.isoformat(), end_date.isoformat()] + list(stations)
-    else:
-        sql = """
-            SELECT p.playlist_id, p.show_name, p.dj_name, p.date_str, p.show_date,
-                   s.spin_time, s.artist, s.song, s.album, s.label, p.station,
-                   COALESCE(al.is_local, 0)
-            FROM spins s
-            JOIN playlists p ON s.playlist_id = p.playlist_id
-            LEFT JOIN artist_locations al ON s.artist = al.artist COLLATE NOCASE
-            WHERE s.artist LIKE ? ESCAPE '\\'
-              AND p.show_date BETWEEN ? AND ?
-            ORDER BY p.show_date, s.spin_time
-        """
-        params = [pattern, start_date.isoformat(), end_date.isoformat()]
+        conditions.append(f"p.station IN ({placeholders})")
+        params += list(stations)
+
+    local_join = "LEFT JOIN" if not local_only else "JOIN"
+    if local_only:
+        conditions.append("al.is_local = 1")
+
+    where = " AND ".join(conditions)
+    sql = f"""
+        SELECT p.playlist_id, p.show_name, p.dj_name, p.date_str, p.show_date,
+               s.spin_time, s.artist, s.song, s.album, s.label, p.station,
+               COALESCE(al.is_local, 0)
+        FROM spins s
+        JOIN playlists p ON s.playlist_id = p.playlist_id
+        {local_join} artist_locations al ON s.artist = al.artist COLLATE NOCASE
+        WHERE {where}
+        ORDER BY p.show_date, s.spin_time
+    """
 
     rows = conn.execute(sql, params).fetchall()
 
@@ -259,12 +253,15 @@ def get_stored_playlist_ids(conn, start_date, end_date, station=None):
     return {r[0] for r in rows}
 
 
-def get_top_artists(conn, start_date, end_date, stations=None, tags=None, tag=None, limit=50):
+def get_top_artists(conn, start_date, end_date, stations=None, tags=None, tag=None, local_only=False, limit=50):
     """Get most-played artists in a date range, optionally filtered by genre tags."""
     conditions = ["p.show_date BETWEEN ? AND ?", "s.artist != ''"]
     where_params = [start_date.isoformat(), end_date.isoformat()]
     joins = ""
     join_params = []
+
+    if local_only:
+        conditions.append("al.is_local = 1")
 
     if stations:
         placeholders = ",".join("?" for _ in stations)

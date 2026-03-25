@@ -78,26 +78,24 @@ MIGRATIONS = [
 ]
 
 
+SEED_VERSION = 3  # bump this to force re-seed on next deploy
+
+
 def _seed_db_if_needed():
     """Decompress bundled DB into data dir on first run."""
     print(f"[db] DB_PATH={DB_PATH}, exists={DB_PATH.exists()}", flush=True)
+    version_file = DB_PATH.parent / "seed_version"
     if DB_PATH.exists():
-        # Check if the DB has location data — if not, replace with newer bundled version
-        try:
-            import sqlite3
-            c = sqlite3.connect(str(DB_PATH))
-            tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-            if "artist_locations" in tables:
-                loc_count = c.execute("SELECT COUNT(*) FROM artist_locations").fetchone()[0]
-            else:
-                loc_count = 0
-            c.close()
-            if loc_count > 50:
-                return
-            print(f"[db] Existing DB has only {loc_count} locations — replacing with bundled data", flush=True)
-            DB_PATH.unlink()
-        except Exception:
+        current_version = 0
+        if version_file.exists():
+            try:
+                current_version = int(version_file.read_text().strip())
+            except Exception:
+                pass
+        if current_version >= SEED_VERSION:
             return
+        print(f"[db] Seed version {current_version} < {SEED_VERSION} — replacing with bundled data", flush=True)
+        DB_PATH.unlink()
     bundled_gz = Path(__file__).parent / "kalx.db.gz"
     print(f"[db] bundled_gz={bundled_gz}, exists={bundled_gz.exists()}", flush=True)
     if bundled_gz.exists():
@@ -107,9 +105,12 @@ def _seed_db_if_needed():
         print(f"[db] Decompressing bundled database to {DB_PATH}...", flush=True)
         with gzip.open(bundled_gz, "rb") as f_in, open(DB_PATH, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
-        print(f"[db] Seeded database ({DB_PATH.stat().st_size // 1024 // 1024}MB)", flush=True)
+        version_file.write_text(str(SEED_VERSION))
+        print(f"[db] Seeded database ({DB_PATH.stat().st_size // 1024 // 1024}MB), version {SEED_VERSION}", flush=True)
     else:
         print(f"[db] No bundled database found, starting fresh", flush=True)
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        version_file.write_text(str(SEED_VERSION))
 
 
 def get_connection():

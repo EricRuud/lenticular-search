@@ -169,6 +169,21 @@ tr:hover td{background:#332060}
         </div>
       </div>
       <div class="filter-section">
+        <div class="filter-title">Release Era</div>
+        <div class="filter-list short" id="eraFilters">
+          <label class="filter-item"><input type="checkbox" name="era" value="2026-2026"> 2026</label>
+          <label class="filter-item"><input type="checkbox" name="era" value="2025-2025"> 2025</label>
+          <label class="filter-item"><input type="checkbox" name="era" value="2020-2024"> 2020s</label>
+          <label class="filter-item"><input type="checkbox" name="era" value="2010-2019"> 2010s</label>
+          <label class="filter-item"><input type="checkbox" name="era" value="2000-2009"> 2000s</label>
+          <label class="filter-item"><input type="checkbox" name="era" value="1990-1999"> 90s</label>
+          <label class="filter-item"><input type="checkbox" name="era" value="1980-1989"> 80s</label>
+          <label class="filter-item"><input type="checkbox" name="era" value="1970-1979"> 70s</label>
+          <label class="filter-item"><input type="checkbox" name="era" value="1960-1969"> 60s</label>
+          <label class="filter-item"><input type="checkbox" name="era" value="1-1959"> Pre-60s</label>
+        </div>
+      </div>
+      <div class="filter-section">
         <div class="filter-title">Genres</div>
         <input type="text" class="genre-search" id="genreSearch" placeholder="Filter genres...">
         <div class="filter-list" id="genreFilters"></div>
@@ -201,6 +216,16 @@ function getSelectedStations(){
 }
 function getSelectedGenres(){
   return [...$$('#genreFilters input:checked')].map(c=>c.value);
+}
+function getSelectedEras(){
+  return [...$$('#eraFilters input:checked')].map(c=>c.value);
+}
+function getYearRange(){
+  const eras=getSelectedEras();
+  if(!eras.length) return {};
+  let min=9999, max=0;
+  eras.forEach(e=>{const[a,b]=e.split('-').map(Number);if(a<min)min=a;if(b>max)max=b});
+  return {year_min:min, year_max:max};
 }
 function getDays(){
   const r=$('input[name="range"]:checked');
@@ -306,8 +331,11 @@ $('#searchForm').addEventListener('submit',async e=>{
   $('#content').innerHTML='<div class="status"><span class="spinner"></span>Searching...</div>';
   try{
     let url=`/api/search?artist=${encodeURIComponent(artist)}&days=${days}`;
+    const yr2=getYearRange();
     if(stations.length) url+=stations.map(s=>`&station=${s}`).join('');
     if($('#localToggle').checked) url+='&local=1';
+    if(yr2.year_min) url+=`&year_min=${yr2.year_min}`;
+    if(yr2.year_max) url+=`&year_max=${yr2.year_max}`;
     const resp=await fetch(url);
     const data=await resp.json();
     if(data.error) throw new Error(data.error);
@@ -364,10 +392,13 @@ async function loadLeaderboard(){
   const genres=getSelectedGenres();
   $('#content').innerHTML='<div class="status"><span class="spinner"></span>Loading top artists...</div>';
   try{
+    const yr=getYearRange();
     let url=`/api/top-artists?days=${days}`;
     if(stations.length) url+=stations.map(s=>`&station=${s}`).join('');
     if(genres.length) url+=genres.map(g=>`&tag=${encodeURIComponent(g)}`).join('');
     if($('#localToggle').checked) url+='&local=1';
+    if(yr.year_min) url+=`&year_min=${yr.year_min}`;
+    if(yr.year_max) url+=`&year_max=${yr.year_max}`;
     const resp=await fetch(url);
     const data=await resp.json();
     if(!data.length){$('#content').innerHTML='<div class="empty">No data for these filters</div>';return}
@@ -461,6 +492,8 @@ def api_search():
     days = int(request.args.get("days", 7))
     stations_list = [s for s in request.args.getlist("station") if s.strip()]
     local_only = request.args.get("local") == "1"
+    year_min = int(request.args["year_min"]) if request.args.get("year_min") else None
+    year_max = int(request.args["year_max"]) if request.args.get("year_max") else None
     if not artist:
         return jsonify({"error": "No artist specified"}), 400
 
@@ -469,7 +502,7 @@ def api_search():
     stations = stations_list or None
 
     conn = get_connection()
-    results = search_db(conn, artist, start_date, end_date, stations=stations, local_only=local_only)
+    results = search_db(conn, artist, start_date, end_date, stations=stations, local_only=local_only, year_min=year_min, year_max=year_max)
     conn.close()
 
     return jsonify({
@@ -493,6 +526,8 @@ def api_top_artists():
     stations_list = [s for s in request.args.getlist("station") if s.strip()]
     tags_list = [t for t in request.args.getlist("tag") if t.strip()]
     local_only = request.args.get("local") == "1"
+    year_min = int(request.args["year_min"]) if request.args.get("year_min") else None
+    year_max = int(request.args["year_max"]) if request.args.get("year_max") else None
     limit = int(request.args.get("limit", 50))
 
     start_date = (datetime.now() - timedelta(days=days)).date()
@@ -500,7 +535,7 @@ def api_top_artists():
     stations = stations_list or None
 
     conn = get_connection()
-    results = get_top_artists(conn, start_date, end_date, stations=stations, tags=tags_list or None, local_only=local_only, limit=limit)
+    results = get_top_artists(conn, start_date, end_date, stations=stations, tags=tags_list or None, local_only=local_only, year_min=year_min, year_max=year_max, limit=limit)
     conn.close()
     return jsonify(results)
 

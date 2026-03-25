@@ -406,6 +406,31 @@ def cmd_build_db(args):
           f"({stats['min_date']} to {stats['max_date']})")
 
 
+def _fetch_musicbrainz_release_year(artist, album):
+    """Fetch release year for an album from MusicBrainz."""
+    time.sleep(1.1)
+    resp = requests.get(
+        "https://musicbrainz.org/ws/2/release/",
+        params={"query": f'artist:"{artist}" AND release:"{album}"', "fmt": "json", "limit": "1"},
+        headers={"User-Agent": "RadioPlaylistSearch/1.0 (release-dates)"},
+        timeout=10,
+    )
+    if not resp.ok:
+        return None, ""
+    data = resp.json()
+    if not data.get("releases"):
+        return None, ""
+    r = data["releases"][0]
+    date_str = r.get("date", "")
+    year = None
+    if date_str and len(date_str) >= 4:
+        try:
+            year = int(date_str[:4])
+        except ValueError:
+            pass
+    return year, date_str
+
+
 def _fetch_musicbrainz_artist(artist):
     """Fetch artist data from MusicBrainz. Returns (tags, area, begin_area)."""
     time.sleep(1.1)  # MusicBrainz rate limit: 1 req/sec
@@ -465,9 +490,29 @@ def cmd_tag_artists(args):
         if (i + 1) % 25 == 0 or (i + 1) == len(unlocated):
             print(f"  Locations: {i + 1}/{len(unlocated)} checked")
 
+    # Fill in release years for albums
+    from db import get_undated_albums, store_album_year
+    undated = get_undated_albums(conn, limit=args.limit)
+    print(f"Found {len(undated)} albums without release year.")
+    dated = 0
+    for i, (artist, album, _) in enumerate(undated):
+        try:
+            year, date_str = _fetch_musicbrainz_release_year(artist, album)
+            if year:
+                store_album_year(conn, artist, album, year, date_str)
+                dated += 1
+            else:
+                store_album_year(conn, artist, album, 0, "")  # mark as checked
+        except Exception:
+            pass
+        if (i + 1) % 25 == 0 or (i + 1) == len(undated):
+            print(f"  Albums: {i + 1}/{len(undated)} checked, {dated} dated")
+
     local_count = conn.execute("SELECT COUNT(*) FROM artist_locations WHERE is_local=1").fetchone()[0]
+    album_count = conn.execute("SELECT COUNT(*) FROM album_years WHERE release_year > 0").fetchone()[0]
     conn.close()
-    print(f"Done. Tagged {tagged} artists, located {located}. {local_count} local Bay Area artists.")
+    print(f"Done. Tagged {tagged} artists, located {located}, dated {dated} albums.")
+    print(f"  {local_count} local Bay Area artists, {album_count} albums with release years.")
 
 
 def cmd_playlist(args):

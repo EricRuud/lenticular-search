@@ -16,6 +16,7 @@ from db import (
     DB_PATH, get_connection, get_db_stats, store_playlist,
     get_stored_playlist_ids, get_untagged_artists, store_artist_tags,
     get_unlocated_artists, store_artist_location,
+    get_undated_albums, store_album_year,
 )
 from kalx import (
     DEFAULT_STATIONS, SPINITRON_STATIONS,
@@ -157,6 +158,22 @@ def backfill():
 
         local_count = conn.execute("SELECT COUNT(*) FROM artist_locations WHERE is_local=1").fetchone()[0]
         print(f"[backfill] Tagged {tagged} artists, {local_count} local", flush=True)
+
+        # Fetch release years for albums
+        from kalx import _fetch_musicbrainz_release_year
+        undated = get_undated_albums(conn, limit=TAG_LIMIT)
+        dated = 0
+        for artist, album, _ in undated:
+            try:
+                year, date_str = _fetch_musicbrainz_release_year(artist, album)
+                if year:
+                    store_album_year(conn, artist, album, year, date_str)
+                    dated += 1
+                else:
+                    store_album_year(conn, artist, album, 0, "")
+            except Exception:
+                pass
+        print(f"[backfill] Dated {dated} albums", flush=True)
     except Exception as exc:
         print(f"[backfill] Tagging error: {exc}", flush=True)
 

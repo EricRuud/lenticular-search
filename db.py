@@ -58,6 +58,16 @@ CREATE TABLE IF NOT EXISTS artist_locations (
     begin_area    TEXT NOT NULL DEFAULT '',
     is_local      INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS album_years (
+    artist        TEXT NOT NULL COLLATE NOCASE,
+    album         TEXT NOT NULL COLLATE NOCASE,
+    release_year  INTEGER,
+    release_date  TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (artist, album)
+);
+
+CREATE INDEX IF NOT EXISTS idx_album_years_year ON album_years(release_year);
 """
 
 MIGRATIONS = [
@@ -162,7 +172,7 @@ def _escape_like(s):
     return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def search_db(conn, query, start_date, end_date, stations=None, local_only=False):
+def search_db(conn, query, start_date, end_date, stations=None, local_only=False, year_min=None, year_max=None):
     """Search spins by artist substring match. Returns grouped results."""
     pattern = f"%{_escape_like(query)}%"
     conditions = ["s.artist LIKE ? ESCAPE '\\'", "p.show_date BETWEEN ? AND ?"]
@@ -177,14 +187,25 @@ def search_db(conn, query, start_date, end_date, stations=None, local_only=False
     if local_only:
         conditions.append("al.is_local = 1")
 
+    year_join = "LEFT JOIN"
+    if year_min is not None or year_max is not None:
+        year_join = "JOIN"
+        if year_min is not None:
+            conditions.append("ay.release_year >= ?")
+            params.append(year_min)
+        if year_max is not None:
+            conditions.append("ay.release_year <= ?")
+            params.append(year_max)
+
     where = " AND ".join(conditions)
     sql = f"""
         SELECT p.playlist_id, p.show_name, p.dj_name, p.date_str, p.show_date,
                s.spin_time, s.artist, s.song, s.album, s.label, p.station,
-               COALESCE(al.is_local, 0)
+               COALESCE(al.is_local, 0), ay.release_year
         FROM spins s
         JOIN playlists p ON s.playlist_id = p.playlist_id
         {local_join} artist_locations al ON s.artist = al.artist COLLATE NOCASE
+        {year_join} album_years ay ON s.artist = ay.artist COLLATE NOCASE AND s.album = ay.album COLLATE NOCASE
         WHERE {where}
         ORDER BY p.show_date, s.spin_time
     """
@@ -263,12 +284,13 @@ def get_stored_playlist_ids(conn, start_date, end_date, station=None):
     return {r[0] for r in rows}
 
 
-def get_top_artists(conn, start_date, end_date, stations=None, tags=None, tag=None, local_only=False, limit=50):
+def get_top_artists(conn, start_date, end_date, stations=None, tags=None, tag=None, local_only=False, year_min=None, year_max=None, limit=50):
     """Get most-played artists in a date range, optionally filtered by genre tags."""
     conditions = ["p.show_date BETWEEN ? AND ?", "s.artist != ''"]
     where_params = [start_date.isoformat(), end_date.isoformat()]
     joins = ""
     join_params = []
+    year_join = ""
 
     if local_only:
         conditions.append("al.is_local = 1")
@@ -287,6 +309,15 @@ def get_top_artists(conn, start_date, end_date, stations=None, tags=None, tag=No
         joins = f"JOIN artist_tags at ON s.artist = at.artist COLLATE NOCASE AND at.tag IN ({placeholders}) COLLATE NOCASE"
         join_params = list(all_tags)
 
+    if year_min is not None or year_max is not None:
+        year_join = "JOIN album_years ay ON s.artist = ay.artist COLLATE NOCASE AND s.album = ay.album COLLATE NOCASE"
+        if year_min is not None:
+            conditions.append("ay.release_year >= ?")
+            where_params.append(year_min)
+        if year_max is not None:
+            conditions.append("ay.release_year <= ?")
+            where_params.append(year_max)
+
     params = join_params + where_params + [limit]
     where = " AND ".join(conditions)
 
@@ -299,6 +330,7 @@ def get_top_artists(conn, start_date, end_date, stations=None, tags=None, tag=No
         FROM spins s
         JOIN playlists p ON s.playlist_id = p.playlist_id
         LEFT JOIN artist_locations al ON s.artist = al.artist COLLATE NOCASE
+        {year_join}
         {joins}
         WHERE {where}
         GROUP BY s.artist COLLATE NOCASE
@@ -380,6 +412,41 @@ def get_unlocated_artists(conn, limit=500):
         LIMIT ?
     """, (limit,)).fetchall()
     return [(r[0], r[1]) for r in rows]
+
+
+def store_album_year(conn, artist, album, release_year, release_date=""):
+    """Store release year for an album."""
+    conn.execute(
+        "INSERT OR REPLACE INTO album_years (artist, album, release_year, release_date) "
+        "VALUES (?, ?, ?, ?)",
+        (artist, album, release_year, release_date),
+    )
+    conn.commit()
+
+
+def get_undated_albums(conn, limit=500):
+    """Get (artist, album) pairs that have no release year yet, sorted by play count."""
+    rows = conn.execute("""
+        SELECT s.artist, s.album, COUNT(*) as play_count
+        FROM spins s
+        LEFT JOIN album_years ay ON s.artist = ay.artist COLLATE NOCASE AND s.album = ay.album COLLATE NOCASE
+        WHERE ay.artist IS NULL AND s.artist != '' AND s.album != ''
+        GROUP BY s.artist COLLATE NOCASE, s.album COLLATE NOCASE
+        ORDER BY play_count DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    return [(r[0], r[1], r[2]) for r in rows]
+
+
+def get_release_year_ranges(conn):
+    """Get available release year decades for the filter UI."""
+    rows = conn.execute("""
+        SELECT DISTINCT (release_year / 10) * 10 as decade
+        FROM album_years
+        WHERE release_year IS NOT NULL AND release_year > 0
+        ORDER BY decade DESC
+    """).fetchall()
+    return [r[0] for r in rows]
 
 
 def get_untagged_artists(conn, limit=200):

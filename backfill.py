@@ -192,11 +192,12 @@ def backfill():
 
 
 def refresh_today():
-    """Quick refresh — fetch just today and yesterday for all stations."""
+    """Quick refresh — fetch new playlists, tag new artists/albums."""
     conn = get_connection()
     today = datetime.now().date()
     yesterday = today - timedelta(days=1)
 
+    # Fetch new playlists
     for target_date in [today, yesterday]:
         for station in DEFAULT_STATIONS:
             try:
@@ -221,6 +222,46 @@ def refresh_today():
                         pass
             except Exception:
                 pass
+
+    # Tag a batch of untagged artists (genres + locations)
+    try:
+        from kalx import _fetch_musicbrainz_artist, _fetch_musicbrainz_release_year
+        from db import (get_untagged_artists, store_artist_tags,
+                        get_unlocated_artists, store_artist_location,
+                        get_undated_albums, store_album_year)
+
+        batch = 50  # tag 50 per refresh cycle
+
+        for artist, _ in get_untagged_artists(conn, limit=batch):
+            try:
+                tags, area, begin_area = _fetch_musicbrainz_artist(artist)
+                if tags:
+                    store_artist_tags(conn, artist, tags)
+                store_artist_location(conn, artist, area, begin_area)
+            except Exception:
+                pass
+
+        for artist, _ in get_unlocated_artists(conn, limit=batch):
+            try:
+                _, area, begin_area = _fetch_musicbrainz_artist(artist)
+                store_artist_location(conn, artist, area, begin_area)
+            except Exception:
+                pass
+
+        dated = 0
+        for artist, album, _ in get_undated_albums(conn, limit=batch):
+            try:
+                year, ds = _fetch_musicbrainz_release_year(artist, album)
+                store_album_year(conn, artist, album, year or 0, ds or "")
+                if year:
+                    dated += 1
+            except Exception:
+                pass
+
+        if dated:
+            print(f"[backfill] Refresh: tagged batch, dated {dated} albums", flush=True)
+    except Exception as exc:
+        print(f"[backfill] Refresh tagging error: {exc}", flush=True)
 
     conn.close()
 

@@ -373,7 +373,7 @@ async function loadLeaderboard(){
     if(!data.length){$('#content').innerHTML='<div class="empty">No data for these filters</div>';return}
     let html='<div class="table-wrap"><table><thead><tr><th>#</th><th>Artist</th><th>Plays</th><th>Shows</th><th>Stations</th></tr></thead><tbody>';
     data.forEach((a,i)=>{
-      html+=`<tr style="cursor:pointer" onclick="searchArtist('${esc(a.artist).replace(/'/g,"\\'")}',event)">
+      html+=`<tr style="cursor:pointer" data-artist="${esc(a.artist).replace(/"/g,'&quot;')}" onclick="searchArtist(this.dataset.artist,event)">
         <td class="rank">${i+1}</td><td class="artist-name">${esc(a.artist)}${loc(a.local)}${mlinks(a.artist)}</td>
         <td class="plays">${a.plays}</td><td class="plays">${a.shows}</td>
         <td><div class="station-tags">${a.stations.map(s=>`<span class="station-tag">${esc(s)}</span>`).join('')}</div></td></tr>`;

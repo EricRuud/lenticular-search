@@ -165,7 +165,7 @@ def _escape_like(s):
 def search_db(conn, query, start_date, end_date, stations=None, local_only=False):
     """Search spins by artist substring match. Returns grouped results."""
     pattern = f"%{_escape_like(query)}%"
-    conditions = ["s.artist LIKE ? ESCAPE '\\\\'", "p.show_date BETWEEN ? AND ?"]
+    conditions = ["s.artist LIKE ? ESCAPE '\\'", "p.show_date BETWEEN ? AND ?"]
     params = [pattern, start_date.isoformat(), end_date.isoformat()]
 
     if stations:

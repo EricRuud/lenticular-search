@@ -90,6 +90,7 @@ tr:hover td{background:#332060}
 .plays{font-variant-numeric:tabular-nums}
 .station-tags{display:flex;gap:.2rem;flex-wrap:wrap}
 .station-tag{font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:#332060;color:#a090b8;border:1px solid #4a3870}
+.year-tag{color:#7a6090;font-size:.7rem;margin-left:.3rem}
 .local-badge{display:inline-block;font-size:.6rem;padding:.1rem .35rem;border-radius:3px;background:#5a7a50;color:#c8e8c0;font-weight:600;margin-left:.35rem;vertical-align:middle;letter-spacing:.02em}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:.3rem 0}
 .toggle-label{font-size:.8rem;color:#a090b8}
@@ -362,7 +363,7 @@ function renderResults(data,artist,days){
         <td class="dj-name hide-mobile">${esc(r.dj_name)}</td>
         <td class="hide-mobile"><a class="playlist-link" onclick="loadPlaylist(${r.playlist_id})">${esc(r.show_name)}</a></td>
         <td class="artist-name">${esc(s.artist)}${loc(s.local)}</td>
-        <td class="song-name">${esc(s.song)}${mlinks(s.artist,s.song)}</td>
+        <td class="song-name">${esc(s.song)}${yr(s.year)}${mlinks(s.artist,s.song)}</td>
         <td class="meta wrap hide-mobile">${esc(s.album)}</td></tr>`;
     }
   }
@@ -437,7 +438,7 @@ async function loadPlaylist(id){
       html+='<div class="table-wrap"><table><thead><tr><th>Time</th><th>Artist</th><th>Song</th><th>Album</th><th>Label</th></tr></thead><tbody>';
       for(const s of data.spins){
         html+=`<tr><td>${s.time}</td><td class="artist-name">${esc(s.artist)}${mlinks(s.artist,s.song)}</td>
-          <td class="song-name">${esc(s.song)}</td><td class="meta wrap">${esc(s.album)}</td>
+          <td class="song-name">${esc(s.song)}${yr(s.year)}</td><td class="meta wrap">${esc(s.album)}</td>
           <td class="meta">${esc(s.label)}</td></tr>`;
       }
       html+='</tbody></table></div>';
@@ -454,6 +455,7 @@ function goBack(){
 
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 function loc(isLocal){return isLocal?'<span class="local-badge">BAY AREA</span>':''}
+function yr(y){return y?`<span class="year-tag">${y}</span>`:''}
 function mlinks(artist,song){
   const q=encodeURIComponent(song?artist+' '+song:artist);
   return `<span class="music-links">`

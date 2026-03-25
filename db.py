@@ -78,7 +78,7 @@ MIGRATIONS = [
 ]
 
 
-SEED_VERSION = 3  # bump this to force re-seed on next deploy
+SEED_VERSION = 4  # bump this to force re-seed on next deploy
 
 
 def _seed_db_if_needed():
@@ -234,6 +234,7 @@ def search_db(conn, query, start_date, end_date, stations=None, local_only=False
             "album": row[8],
             "label": row[9],
             "local": bool(row[11]),
+            "year": row[12] if row[12] and row[12] > 0 else None,
         })
 
     return list(grouped.values())
@@ -251,8 +252,11 @@ def get_playlist_from_db(conn, playlist_id):
 
     show_date = date.fromisoformat(row[4]) if row[4] else None
     spins = conn.execute(
-        "SELECT spin_time, artist, song, album, label FROM spins "
-        "WHERE playlist_id = ? ORDER BY rowid",
+        """SELECT s.spin_time, s.artist, s.song, s.album, s.label,
+                  ay.release_year
+           FROM spins s
+           LEFT JOIN album_years ay ON s.artist = ay.artist COLLATE NOCASE AND s.album = ay.album COLLATE NOCASE
+           WHERE s.playlist_id = ? ORDER BY s.rowid""",
         (playlist_id,),
     ).fetchall()
 
@@ -264,7 +268,8 @@ def get_playlist_from_db(conn, playlist_id):
         "date": show_date,
         "station": row[5],
         "spins": [
-            {"time": s[0], "artist": s[1], "song": s[2], "album": s[3], "label": s[4]}
+            {"time": s[0], "artist": s[1], "song": s[2], "album": s[3], "label": s[4],
+             "year": s[5] if s[5] and s[5] > 0 else None}
             for s in spins
         ],
     }

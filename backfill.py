@@ -24,7 +24,7 @@ from kalx import (
 )
 
 BACKFILL_DAYS = 30
-TAG_LIMIT = 200
+TAG_LIMIT = 500
 STATUS_FILE = DB_PATH.parent / "backfill_status.json"
 
 

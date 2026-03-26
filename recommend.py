@@ -144,6 +144,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
                 + COALESCE(dj.dj_count, 0) * 5
                 + CASE WHEN COALESCE(rr.newest, 0) >= 2024 THEN 20
                        WHEN COALESCE(rr.newest, 0) >= 2020 THEN 10 ELSE 0 END
+                - CASE WHEN COALESCE(rr.newest, 0) BETWEEN 1 AND 2014 THEN 25 ELSE 0 END
                 - CASE WHEN a.total_plays > 200 THEN 30
                        WHEN a.total_plays > 100 THEN 15 ELSE 0 END
                ) as score

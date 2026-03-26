@@ -70,8 +70,18 @@ LINEUP_PEERS = {
 }
 
 
+# Extra seeds only applied for specific artists we've researched
+CURATED_SEEDS = {
+    "the lenticular clouds": list(BANDCAMP_SIMILAR) + list(LINEUP_PEERS),
+}
+
+
 def get_seed_artists_from_playlists(conn, artist):
-    """Find artists that share playlists with the given artist."""
+    """Find artists that share playlists with the given artist.
+
+    For bands with only a few plays, also uses their genre tags to find
+    similar artists as seeds.
+    """
     rows = conn.execute("""
         SELECT s2.artist, COUNT(DISTINCT s2.playlist_id) as shared
         FROM spins s1
@@ -83,8 +93,30 @@ def get_seed_artists_from_playlists(conn, artist):
     """, (f"%{artist}%",)).fetchall()
     playlist_seeds = [r[0] for r in rows]
 
-    # Add Bandcamp-similar and lineup-peer artists as seeds
-    for extra in list(BANDCAMP_SIMILAR) + list(LINEUP_PEERS):
+    # If very few playlist seeds, supplement with genre-similar artists
+    if len(playlist_seeds) < 5:
+        # Get this artist's tags
+        tags = [r[0] for r in conn.execute(
+            "SELECT tag FROM artist_tags WHERE artist LIKE ? COLLATE NOCASE",
+            (f"%{artist}%",)
+        ).fetchall()]
+        if not tags:
+            tags = list(POSITIVE_TAGS[:10])  # fallback to generic indie tags
+        tag_ph = ",".join(["?"] * len(tags))
+        genre_seeds = conn.execute(f"""
+            SELECT at.artist, COUNT(*) as overlap
+            FROM artist_tags at
+            WHERE at.tag IN ({tag_ph}) AND at.artist NOT LIKE ? COLLATE NOCASE
+            GROUP BY at.artist COLLATE NOCASE
+            ORDER BY overlap DESC
+            LIMIT 15
+        """, tags + [f"%{artist}%"]).fetchall()
+        for r in genre_seeds:
+            if r[0] not in playlist_seeds:
+                playlist_seeds.append(r[0])
+
+    # Add curated seeds for specifically researched artists
+    for extra in CURATED_SEEDS.get(artist.lower(), []):
         if extra not in playlist_seeds:
             playlist_seeds.append(extra)
 

@@ -49,7 +49,6 @@ EXCLUDE_ARTISTS = {
 
 
 # Bands that Bandcamp's algorithm recommends to Lenticular Clouds fans.
-# These are the highest-confidence taste signals we have.
 BANDCAMP_SIMILAR = {
     'Sugar Candy Mountain',  # Oakland, psych pop
     'Moon Duo',              # SF, psych rock
@@ -58,6 +57,15 @@ BANDCAMP_SIMILAR = {
     'Imp of Perverse',       # Texas, bedroom pop
     'Junk Drawer',           # Belfast, art rock
     'The Minus 5',           # Portland, indie pop
+}
+
+# Bands that have shared real-world bills with similar artists
+# (from Songkick data for Sugar Candy Mountain, Moon Duo, Wooden Shjips,
+#  LSD and the Search for God, Tanukichan, Hot Flash Heat Wave)
+LINEUP_PEERS = {
+    'Assemble Head in Sunburst Sound', 'Lumerians', 'Asteroid #4',
+    'Federale', 'Soft Kill', 'Ringo Deathstarr', 'Enumclaw',
+    'Wisp', 'Wand', 'Swimming Bell', 'Skinshape', 'Noelle and the Deserters',
 }
 
 
@@ -74,10 +82,10 @@ def get_seed_artists_from_playlists(conn, artist):
     """, (f"%{artist}%",)).fetchall()
     playlist_seeds = [r[0] for r in rows]
 
-    # Add Bandcamp-similar artists as seeds too
-    for bc_artist in BANDCAMP_SIMILAR:
-        if bc_artist not in playlist_seeds:
-            playlist_seeds.append(bc_artist)
+    # Add Bandcamp-similar and lineup-peer artists as seeds
+    for extra in list(BANDCAMP_SIMILAR) + list(LINEUP_PEERS):
+        if extra not in playlist_seeds:
+            playlist_seeds.append(extra)
 
     return playlist_seeds
 

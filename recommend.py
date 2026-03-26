@@ -44,6 +44,21 @@ def get_seed_artists_from_playlists(conn, artist):
     return [r[0] for r in rows]
 
 
+def get_taste_djs(conn, seeds, min_seed_artists=3):
+    """Find DJs whose playlists contain multiple seed artists."""
+    seed_ph = ",".join(["?"] * len(seeds))
+    rows = conn.execute(f"""
+        SELECT p.dj_name, COUNT(DISTINCT s.artist) as seed_count
+        FROM spins s
+        JOIN playlists p ON s.playlist_id = p.playlist_id
+        WHERE s.artist IN ({seed_ph})
+        GROUP BY p.dj_name COLLATE NOCASE
+        HAVING seed_count >= ?
+        ORDER BY seed_count DESC
+    """, seeds + [min_seed_artists]).fetchall()
+    return [r[0] for r in rows]
+
+
 def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
                         recent_days=90, limit=30):
     """Generate show bill recommendations for an artist.
@@ -57,9 +72,18 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
         # Fall back to just genre-based if no playlist data
         seeds = [artist]
 
+    # Find DJs with aligned taste
+    taste_djs = get_taste_djs(conn, seeds, min_seed_artists=3)
+
     seed_ph = ",".join(["?"] * len(seeds))
     pos_ph = ",".join(["?"] * len(POSITIVE_TAGS))
     neg_ph = ",".join(["?"] * len(NEGATIVE_TAGS))
+    dj_ph = ",".join(["?"] * len(taste_djs)) if taste_djs else "''"
+
+    params = (seeds + POSITIVE_TAGS + NEGATIVE_TAGS
+              + (taste_djs if taste_djs else [])
+              + [min_plays, max_plays, f"%{artist}%"]
+              + seeds + [limit])
 
     rows = conn.execute(f"""
         WITH cooccurrence AS (
@@ -81,6 +105,13 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
             WHERE at.tag IN ({neg_ph})
             GROUP BY at.artist COLLATE NOCASE
         ),
+        dj_affinity AS (
+            SELECT s.artist, COUNT(DISTINCT p.dj_name) as dj_count
+            FROM spins s
+            JOIN playlists p ON s.playlist_id = p.playlist_id
+            WHERE p.dj_name IN ({dj_ph})
+            GROUP BY s.artist COLLATE NOCASE
+        ),
         all_plays AS (
             SELECT s.artist, COUNT(*) as total_plays, MAX(p.show_date) as last_play
             FROM spins s JOIN playlists p ON s.playlist_id = p.playlist_id
@@ -100,7 +131,8 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
                COALESCE(rr.newest, 0) as newest_release,
                (COALESCE(c.shared, 0) * 3
                 + COALESCE(pt.tag_matches, 0) * 8
-                - COALESCE(nt.bad_matches, 0) * 10
+                - COALESCE(nt.bad_matches, 0) * 15
+                + COALESCE(dj.dj_count, 0) * 5
                 + CASE WHEN COALESCE(rr.newest, 0) >= 2024 THEN 20
                        WHEN COALESCE(rr.newest, 0) >= 2020 THEN 10 ELSE 0 END
                 - CASE WHEN a.total_plays > 200 THEN 30
@@ -111,6 +143,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
         LEFT JOIN cooccurrence c ON a.artist = c.artist COLLATE NOCASE
         LEFT JOIN pos_tags pt ON a.artist = pt.artist COLLATE NOCASE
         LEFT JOIN neg_tags nt ON a.artist = nt.artist COLLATE NOCASE
+        LEFT JOIN dj_affinity dj ON a.artist = dj.artist COLLATE NOCASE
         LEFT JOIN recent_release rr ON a.artist = rr.artist COLLATE NOCASE
         WHERE al.is_local = 1
           AND a.total_plays BETWEEN ? AND ?
@@ -118,7 +151,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
           AND a.artist NOT IN ({seed_ph})
         ORDER BY score DESC
         LIMIT ?
-    """, seeds + POSITIVE_TAGS + NEGATIVE_TAGS + [min_plays, max_plays, f"%{artist}%"] + seeds + [limit]).fetchall()
+    """, params).fetchall()
 
     return [
         {

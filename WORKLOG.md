@@ -58,8 +58,47 @@
 - "Deftones", "Faith No More" feel wrong — too heavy
 - Missing city data for some bands (need more MusicBrainz lookups)
 
-## Next iterations to try:
-- Weight down bands with "metal", "hardcore", "hip hop" tags
-- Boost bands whose DJs also played Lenticular Clouds
-- Add a "venue fit" signal: has this band played Bottom of the Hill before?
-- Try expanding seed artists beyond just the one playlist
+## Iteration 9: Negative genre tag penalties
+
+**Result:** Added NEGATIVE_TAGS list (metal, hip hop, country, etc) with -10 per match. Deftones, Faith No More, Mac Dre, Testament all dropped off. Top list now: Everyone Is Dirty, Deerhoof, Hot Flash Heat Wave, Tanukichan, Fake Fruit, Topographies, LSD and the Search for God, Osees.
+
+**Evaluation:** Much better vibe match. The negative tags effectively filter out wrong-genre bands.
+
+## Iterations 10-11: DJ affinity analysis
+
+**Result:** Found DJs whose taste aligns: DJ Conifer (KDVS), DJ Honeypot (KDVS), DJ Otter Mason (BFF.fm), dj siick (KSJS), Space Abuela (BFF.fm). Their playlists revealed new candidates: pardoner, The Fresh & Onlys, Pacing, No Vacation, Haley Heynderickx, Duster, Tuxedomoon.
+
+**Evaluation:** DJ affinity surfaces bands that pure co-occurrence misses. These are bands whose aesthetic is validated by human tastemakers who also like the Lenticular Clouds sound.
+
+## Iterations 12-13: DJ affinity scoring + penalty tuning
+
+**Result:** Added dj_count * 5 to score (how many aligned DJs play this band). Increased negative tag penalty to -15. Current top list:
+1. Everyone Is Dirty (post-punk/art rock)
+2. Jay Som (indie rock/dream pop, Walnut Creek)
+3. Whirr (shoegaze, SF)
+4. Xiu Xiu (experimental, San Jose)
+5. LSD and the Search for God (shoegaze, SF)
+6. Tanukichan (shoegaze/noise pop)
+7. Fake Fruit (post-punk, Oakland)
+8. SPELLLING (experimental, Sacramento)
+9. Hot Flash Heat Wave (dream pop/garage, SF)
+10. Sweet Trip (dream pop/shoegaze, SF)
+11. Haley Heynderickx (folk/singer-songwriter, Stockton)
+12. Madeline Kenney (indie)
+13. Duster (slowcore/shoegaze, San Jose)
+14. Topographies (post-punk/shoegaze, SF)
+15. Tuxedomoon (post-punk/art rock, SF)
+
+**Evaluation:** This is a STRONG list for a Bottom of the Hill bill. The algorithm is surfacing exactly the kind of dreamy, psych-adjacent indie bands that would fit. Still some legacy acts high (Pavement, Jefferson Airplane, Deerhoof) that are too big. Need to keep refining the "bookability" signal.
+
+## Current best candidates for the bill:
+- **Everyone Is Dirty** — post-punk/psychedelic pop, Oakland, active
+- **Fake Fruit** — post-punk/indie rock, Oakland, 2024 release
+- **Tanukichan** — shoegaze/dream pop, active
+- **Hot Flash Heat Wave** — dream pop/garage rock, SF
+- **Topographies** — post-punk/shoegaze/dark wave, SF
+- **LSD and the Search for God** — shoegaze, SF
+- **Sweet Trip** — dream pop/glitch pop, SF
+- **Duster** — slowcore/shoegaze, San Jose
+- **Haley Heynderickx** — folk/singer-songwriter
+- **pardoner** — punk/rock, active, 99 plays

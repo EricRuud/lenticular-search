@@ -135,6 +135,44 @@
 2. Art Punk Night: Lenticular Clouds + Xiu Xiu + Everyone Is Dirty
 3. Indie Pop Night: Lenticular Clouds + Haley Heynderickx + Hemlocke Springs
 
+## Iteration 21: Artist track preview
+
+**Added:** Click any recommended band to see their most-played tracks on Bay Area radio with platform links.
+
+**Removed:** Redundant "BAY AREA" badge on Show Bill tab (all recs are local).
+
+## Iteration 22: Bandcamp verification + single link
+
+**Added:** Verified all top 14 recommendations have Bandcamp pages. Replaced full platform link bar with single "bandcamp" link.
+
+**Removed:** 4-platform link bar on Show Bill tab (cluttered, Bandcamp most relevant for indie).
+
+## Iteration 23: Era penalty for legacy acts
+
+**Added:** -25 score for bands whose newest known release is pre-2015. Jefferson Airplane and similar legacy acts drop appropriately.
+
+**Removed:** Legacy acts from competitive rankings via era penalty.
+
+## Iteration 24: Aesthetic keyword scoring
+
+**Added:** Song/album title keyword matching for psych/dreamy aesthetics (dream, moon, cosmic, crystal, etc.). New discoveries: Wooden Shjips, venturing, Sparklehorse, Moon Duo, Wild Moth.
+
+**Current top 10 after 24 iterations:**
+1. LSD and the Search for God [plays BOTH] — shoegaze, SF
+2. Xiu Xiu — experimental, San Jose
+3. Haley Heynderickx — folk/singer-songwriter, Stockton
+4. Sweet Trip — dream pop/glitch, SF
+5. Whirr — shoegaze, SF
+6. Ty Segall — psych/garage, Palo Alto
+7. Tanukichan — shoegaze/noise pop
+8. venturing — Newark (rising band)
+9. Everyone Is Dirty — post-punk/art rock
+10. Hot Flash Heat Wave — dream pop/garage, SF
+11. Wooden Shjips — psych rock, SF
+12. Duster — slowcore/shoegaze, San Jose
+13. Hemlocke Springs — Concord
+14. Fake Fruit — post-punk, Oakland
+
 ## Iteration 14: Replace co-occurrence with same-set pairing
 
 **Added:** `same_set` signal — counts how many different seed artists a band gets paired with in the same DJ set (playlist). Weighted by `seed_variety` (diversity of pairings) rather than raw count. Weight: seed_variety * 6.

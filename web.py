@@ -91,6 +91,17 @@ tr:hover td{background:#332060}
 .station-tags{display:flex;gap:.2rem;flex-wrap:wrap}
 .station-tag{font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:#332060;color:#a090b8;border:1px solid #4a3870}
 .year-tag{color:#7a6090;font-size:.7rem;margin-left:.3rem}
+.showbill-header{margin-bottom:1rem;color:#9a80b0;font-size:.85rem}
+.showbill-header strong{color:#e060a0}
+.rec-score{color:#e060a0;font-weight:700;font-variant-numeric:tabular-nums}
+.rec-city{color:#c8a0c8;font-size:.75rem}
+.rec-signals{font-size:.7rem;color:#7a6090}
+.showbill-input{display:flex;gap:.5rem;margin-bottom:1rem}
+.showbill-input input{flex:1;background:#332060;border:1px solid #5a3d7a;border-radius:6px;color:#e8e0f0;padding:.5rem .8rem;font-size:.9rem}
+.showbill-input input:focus{outline:none;border-color:#e060a0}
+.showbill-input input::placeholder{color:#7a6090}
+.showbill-input button{background:#e060a0;color:#fff;border:none;border-radius:6px;padding:.5rem 1rem;font-weight:600;cursor:pointer}
+.showbill-input button:hover{background:#c84888}
 .local-badge{display:inline-block;font-size:.6rem;padding:.1rem .35rem;border-radius:3px;background:#5a7a50;color:#c8e8c0;font-weight:600;margin-left:.35rem;vertical-align:middle;letter-spacing:.02em}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:.3rem 0}
 .toggle-label{font-size:.8rem;color:#a090b8}
@@ -199,6 +210,7 @@ tr:hover td{background:#332060}
     <div class="tabs">
       <div class="tab" data-tab="results">Search</div>
       <div class="tab active" data-tab="leaderboard">Top Artists</div>
+      <div class="tab" data-tab="showbill">Show Bill</div>
       <div class="tab" data-tab="recent">Recent</div>
     </div>
     <div id="content"></div>
@@ -317,6 +329,7 @@ $$('.tab').forEach(t=>t.addEventListener('click',()=>{
   currentTab=t.dataset.tab;
   if(currentTab==='recent') loadRecent();
   else if(currentTab==='leaderboard') loadLeaderboard();
+  else if(currentTab==='showbill') showShowBill();
   else $('#content').innerHTML='<div class="empty">Search for an artist above</div>';
   if(window.innerWidth<=768) $('#sidebar').classList.remove('open');
 }));
@@ -413,6 +426,43 @@ async function loadLeaderboard(){
     html+='</tbody></table></div>';
     $('#content').innerHTML=html;
   }catch(err){$('#content').innerHTML=`<div class="status error">Error: ${err.message}</div>`}
+}
+
+function showShowBill(){
+  let html=`<div class="showbill-header">Find local Bay Area bands for a show bill. Enter a band name to find who fits.</div>`;
+  html+=`<div class="showbill-input"><input type="text" id="showbillArtist" placeholder="Your band name..." value="The Lenticular Clouds"><button onclick="loadShowBill()">Find Bands</button></div>`;
+  html+=`<div id="showbillResults"></div>`;
+  $('#content').innerHTML=html;
+  loadShowBill();
+}
+
+async function loadShowBill(){
+  const artist=$('#showbillArtist')?.value?.trim();
+  if(!artist) return;
+  const el=$('#showbillResults');
+  el.innerHTML='<div class="status"><span class="spinner"></span>Finding bands...</div>';
+  try{
+    const resp=await fetch(`/api/show-bill?artist=${encodeURIComponent(artist)}`);
+    const data=await resp.json();
+    if(!data.length){el.innerHTML='<div class="empty">No recommendations found. Try a different artist or check back as more data loads.</div>';return}
+    let html='<div class="table-wrap"><table><thead><tr><th>#</th><th>Band</th><th>City</th><th>Why</th><th>Latest Release</th><th>Score</th></tr></thead><tbody>';
+    data.forEach((r,i)=>{
+      const signals=[];
+      if(r.cooccurrence>0) signals.push(`${r.cooccurrence} shared playlists`);
+      if(r.genre_match>0) signals.push(`${r.genre_match} genre matches`);
+      signals.push(`${r.total_plays} plays`);
+      html+=`<tr>
+        <td class="rank">${i+1}</td>
+        <td class="artist-name">${esc(r.artist)}${loc(true)}${mlinks(r.artist)}</td>
+        <td class="rec-city">${esc(r.city)}</td>
+        <td class="rec-signals">${signals.join(' · ')}</td>
+        <td>${r.newest_release||'?'}</td>
+        <td class="rec-score">${r.score}</td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+    el.innerHTML=html;
+  }catch(err){el.innerHTML=`<div class="status error">Error: ${err.message}</div>`}
 }
 
 function searchArtist(name,e){
@@ -548,6 +598,18 @@ def api_tags():
     tags = get_all_tags(conn)
     conn.close()
     return jsonify(tags)
+
+
+@app.route("/api/show-bill")
+def api_show_bill():
+    artist = request.args.get("artist", "").strip()
+    if not artist:
+        return jsonify({"error": "No artist specified"}), 400
+    from recommend import recommend_show_bill
+    conn = get_connection()
+    results = recommend_show_bill(conn, artist)
+    conn.close()
+    return jsonify(results)
 
 
 @app.route("/api/stats")

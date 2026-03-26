@@ -144,7 +144,15 @@ $('#searchForm').addEventListener('submit',async e=>{
 
 function renderResults(data,band){
   if(!data.recommendations.length){
-    $('#results').innerHTML='<div class="empty">No recommendations found. Try a different band name, or check back as more data loads.</div>';
+    $('#results').innerHTML=`<div class="empty">
+      <p>No local matches found for <strong style="color:#e060a0">${esc(band)}</strong>.</p>
+      <p style="margin-top:.5rem;font-size:.85rem">Try a Bay Area band, or pick a genre:</p>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center;margin-top:.8rem">
+        ${['shoegaze','dream pop','post-punk','garage rock','hip hop','psych rock','folk','indie pop'].map(g=>
+          `<a style="color:#9a80b0;background:#332060;padding:.3rem .6rem;border-radius:4px;cursor:pointer;font-size:.8rem;text-decoration:none" onclick="tryBand('${g}')">${g}</a>`
+        ).join('')}
+      </div>
+    </div>`;
     return;
   }
 

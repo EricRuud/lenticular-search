@@ -240,7 +240,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
                COALESCE(pt.tag_matches, 0) as genre_match,
                a.total_plays,
                a.last_play,
-               al.begin_area,
+               CASE WHEN al.begin_area != '' THEN al.begin_area ELSE al.area END,
                COALESCE(rr.newest, 0) as newest_release,
                (COALESCE(ss.seed_variety, 0) * 6
                 + COALESCE(ct.core_matches, 0) * 15

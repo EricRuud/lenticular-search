@@ -180,7 +180,7 @@ function renderResults(data,band){
     html+=`<div class="band-card">
       <div class="band-top">
         <a class="band-name" style="cursor:pointer;text-decoration:none;color:#e8e0f0" data-artist="${esc(r.artist).replace(/"/g,'&quot;')}" onclick="showDetail(this.dataset.artist)">${esc(r.artist)}</a>
-        <span class="band-city">${esc(r.city)}</span>
+        ${r.city?`<span class="band-city">${esc(r.city)}</span>`:''}
         <div class="band-badges">${badges.join('')}</div>
       </div>
       ${tagHtml?`<div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.4rem">${tagHtml}</div>`:''}

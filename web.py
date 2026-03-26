@@ -449,8 +449,7 @@ async function loadShowBill(){
     data.forEach((r,i)=>{
       const signals=[];
       if(r.seed_variety>0) signals.push(`paired with ${r.seed_variety} similar artists`);
-      if(r.genre_match>0) signals.push(`${r.genre_match} genre matches`);
-      signals.push(`${r.total_plays} plays`);
+      if(r.genre_match>0) signals.push(`${r.genre_match} genre overlap`);
       html+=`<tr>
         <td class="rank">${i+1}</td>
         <td class="artist-name">${esc(r.artist)}${loc(true)}${mlinks(r.artist)}</td>

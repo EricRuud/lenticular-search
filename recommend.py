@@ -59,7 +59,7 @@ def get_taste_djs(conn, seeds, min_seed_artists=3):
     return [r[0] for r in rows]
 
 
-def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
+def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
                         recent_days=90, limit=30):
     """Generate show bill recommendations for an artist.
 

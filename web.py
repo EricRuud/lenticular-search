@@ -453,10 +453,10 @@ async function loadShowBill(){
       if(r.venue_confirmed) signals.push('plays Bottom of the Hill');
       if(r.seed_variety>0) signals.push(`paired with ${r.seed_variety} similar artists`);
       if(r.genre_match>0) signals.push(`${r.genre_match} genre overlap`);
-      const badges=loc(true)+(r.venue_confirmed?'<span class="venue-badge">BOTH</span>':'');
+      const badges=(r.venue_confirmed?'<span class="venue-badge">BOTH</span>':'');
       html+=`<tr>
         <td class="rank">${i+1}</td>
-        <td class="artist-name">${esc(r.artist)}${badges}${mlinks(r.artist)}</td>
+        <td class="artist-name"><a class="playlist-link" data-artist="${esc(r.artist).replace(/"/g,'&quot;')}" onclick="previewArtist(this.dataset.artist)">${esc(r.artist)}</a>${badges}${mlinks(r.artist)}</td>
         <td class="rec-city">${esc(r.city)}</td>
         <td class="rec-signals">${signals.join(' · ')}</td>
         <td>${r.newest_release||'?'}</td>
@@ -485,6 +485,27 @@ async function loadShowBill(){
       ph+='</div>';
       pitch.innerHTML=ph;
     }
+  }catch(err){el.innerHTML=`<div class="status error">Error: ${err.message}</div>`}
+}
+
+async function previewArtist(name){
+  const el=$('#showbillResults');
+  const prev=el.innerHTML;
+  el.innerHTML=`<div class="status"><span class="spinner"></span>Loading ${esc(name)}...</div>`;
+  try{
+    const resp=await fetch(`/api/artist-tracks?artist=${encodeURIComponent(name)}`);
+    const data=await resp.json();
+    let html=`<div class="back-link" onclick="document.getElementById('showbillResults').innerHTML=window._prevShowbill||''">&larr; Back to recommendations</div>`;
+    html+=`<div class="playlist-header"><h2>${esc(name)}</h2><div class="details">Most played tracks on Bay Area radio</div></div>`;
+    html+='<div class="table-wrap"><table><thead><tr><th>Song</th><th>Album</th><th>Plays</th><th>Stations</th></tr></thead><tbody>';
+    data.forEach(t=>{
+      html+=`<tr><td class="song-name">${esc(t.song)}${yr(t.year)}${mlinks(name,t.song)}</td>
+        <td class="meta wrap">${esc(t.album)}</td><td class="plays">${t.plays}</td>
+        <td><div class="station-tags">${t.stations.map(s=>\`<span class="station-tag">\${esc(s)}</span>\`).join('')}</div></td></tr>`;
+    });
+    html+='</tbody></table></div>';
+    window._prevShowbill=prev;
+    el.innerHTML=html;
   }catch(err){el.innerHTML=`<div class="status error">Error: ${err.message}</div>`}
 }
 
@@ -621,6 +642,37 @@ def api_tags():
     tags = get_all_tags(conn)
     conn.close()
     return jsonify(tags)
+
+
+@app.route("/api/artist-tracks")
+def api_artist_tracks():
+    artist = request.args.get("artist", "").strip()
+    if not artist:
+        return jsonify([])
+    conn = get_connection()
+    rows = conn.execute("""
+        SELECT s.song, s.album, COUNT(*) as plays,
+               GROUP_CONCAT(DISTINCT p.station) as stations,
+               ay.release_year
+        FROM spins s
+        JOIN playlists p ON s.playlist_id = p.playlist_id
+        LEFT JOIN album_years ay ON s.artist = ay.artist COLLATE NOCASE AND s.album = ay.album COLLATE NOCASE
+        WHERE s.artist = ? COLLATE NOCASE
+        GROUP BY s.song COLLATE NOCASE, s.album COLLATE NOCASE
+        ORDER BY plays DESC
+        LIMIT 20
+    """, (artist,)).fetchall()
+    conn.close()
+    return jsonify([
+        {
+            "song": r[0],
+            "album": r[1],
+            "plays": r[2],
+            "stations": r[3].split(",") if r[3] else [],
+            "year": r[4] if r[4] and r[4] > 0 else None,
+        }
+        for r in rows
+    ])
 
 
 @app.route("/api/show-bill")

@@ -166,19 +166,16 @@ function renderResults(data,band){
     if(r.venue_confirmed) badges.push('<span class="badge badge-venue">PLAYS BOTTOM OF THE HILL</span>');
     if(r.newest_release && r.newest_release>=2025) badges.push(`<span class="badge badge-active">NEW RELEASE ${r.newest_release}</span>`);
 
-    const why=[];
-    if(r.seed_variety>0) why.push(`DJs pair them with ${r.seed_variety} similar artists`);
-    if(r.genre_match>0) why.push(`${r.genre_match} genre overlaps`);
-    if(r.venue_confirmed) why.push('confirmed Bottom of the Hill act');
-
     const q=encodeURIComponent(r.artist);
+    const tagHtml=(r.tags||[]).map(t=>`<span style="color:#9a80b0;font-size:.7rem;background:#332060;padding:.1rem .35rem;border-radius:3px">${esc(t)}</span>`).join(' ');
+
     html+=`<div class="band-card">
       <div class="band-top">
         <a class="band-name" style="cursor:pointer;text-decoration:none;color:#e8e0f0" data-artist="${esc(r.artist).replace(/"/g,'&quot;')}" onclick="showDetail(this.dataset.artist)">${esc(r.artist)}</a>
         <span class="band-city">${esc(r.city)}</span>
         <div class="band-badges">${badges.join('')}</div>
       </div>
-      ${why.length?`<div class="band-why">${why.join(' · ')}</div>`:''}
+      ${tagHtml?`<div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.4rem">${tagHtml}</div>`:''}
       <div class="band-links">
         <a href="https://bandcamp.com/search?q=${q}" target="_blank">bandcamp</a>
         <a href="https://open.spotify.com/search/${q}" target="_blank">spotify</a>

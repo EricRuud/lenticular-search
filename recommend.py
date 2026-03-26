@@ -278,6 +278,13 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
         venue_confirmed = is_venue_confirmed(r[0])
         scene_bonus = min(scene_scores.get(r[0].lower(), 0), 15) * 2
         final_score = r[7] + (25 if venue_confirmed else 0) + scene_bonus
+
+        # Fetch genre tags for display
+        tags = [t[0] for t in conn.execute(
+            "SELECT tag FROM artist_tags WHERE artist = ? COLLATE NOCASE ORDER BY score DESC LIMIT 4",
+            (r[0],)
+        ).fetchall()]
+
         results.append({
             "artist": r[0],
             "seed_variety": r[1],
@@ -286,9 +293,9 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
             "last_play": r[4],
             "city": r[5] or "",
             "newest_release": r[6] if r[6] > 0 else None,
-            "score": final_score,
             "venue_confirmed": venue_confirmed,
+            "tags": tags,
         })
 
-    results.sort(key=lambda x: -x["score"])
+    results.sort(key=lambda x: -(x["genre_match"] * 8 + x["seed_variety"] * 6 + (25 if x["venue_confirmed"] else 0) + scene_scores.get(x["artist"].lower(), 0) * 2))
     return results

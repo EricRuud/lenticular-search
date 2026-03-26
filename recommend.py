@@ -132,6 +132,16 @@ def get_seed_artists_from_playlists(conn, artist):
             if r[0] not in playlist_seeds:
                 playlist_seeds.append(r[0])
 
+    # Add Last.fm similar artists as seeds
+    try:
+        from lastfm import get_similar_artists
+        lastfm_similar = get_similar_artists(artist, limit=10)
+        for s in lastfm_similar:
+            if s not in playlist_seeds:
+                playlist_seeds.append(s)
+    except Exception:
+        pass
+
     # Add curated seeds for specifically researched artists
     for extra in CURATED_SEEDS.get(artist.lower(), []):
         if extra not in playlist_seeds:
@@ -295,9 +305,25 @@ def recommend_show_bill(conn, artist, min_plays=5, max_plays=100,
 
     from venues import is_venue_confirmed
 
+    # Batch fetch listener counts from Last.fm (parallel)
+    from lastfm import get_listener_count
+    from concurrent.futures import ThreadPoolExecutor
+    listener_cache = {}
+    artist_names_top = [r[0] for r in rows[:20]]
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {pool.submit(get_listener_count, name): name for name in artist_names_top}
+        for f in futures:
+            try:
+                count = f.result(timeout=10)
+                if count is not None:
+                    listener_cache[futures[f].lower()] = count
+            except Exception:
+                pass
+
     results = []
     for r in rows:
         venue_confirmed = is_venue_confirmed(r[0])
+        listeners = listener_cache.get(r[0].lower())
         final_score = r[7] + (20 if venue_confirmed else 0)
 
         # Fetch genre tags for display
@@ -318,6 +344,7 @@ def recommend_show_bill(conn, artist, min_plays=5, max_plays=100,
             "venue_confirmed": venue_confirmed,
             "tags": tags,
             "stations": stations,
+            "listeners": listeners,
             "_score": final_score,
         })
 

@@ -7,12 +7,26 @@ using co-occurrence, genre overlap, recency, and bookability signals.
 from db import get_connection
 
 # Genre tags that define the indie/psych/art-pop neighborhood
-SEED_TAGS = [
+POSITIVE_TAGS = [
     'indie rock', 'indie pop', 'rock', 'singer-songwriter', 'alternative rock',
     'art pop', 'folk', 'freak folk', 'dream pop', 'psychedelic rock',
     'garage rock', 'lo-fi', 'shoegaze', 'surf rock', 'jangle pop',
     'post-punk', 'new wave', 'experimental rock', 'noise pop',
     'indie', 'psychedelic', 'experimental', 'krautrock', 'art rock',
+    'psychedelic pop', 'noise pop', 'dark wave', 'glitch pop',
+    'indietronica', 'chamber pop', 'baroque pop', 'twee pop',
+]
+
+# Tags that indicate a bad fit for the bill
+NEGATIVE_TAGS = [
+    'metal', 'heavy metal', 'thrash metal', 'death metal', 'nu metal',
+    'alternative metal', 'funk metal', 'speed metal', 'black metal',
+    'hardcore', 'hardcore punk', 'metalcore', 'deathcore',
+    'hip hop', 'rap', 'gangsta rap', 'west coast hip hop', 'trap',
+    'r&b', 'contemporary r&b', 'soul', 'gospel',
+    'country', 'country rock', 'blues rock', 'southern rock',
+    'classic rock', 'arena rock',
+    'edm', 'house', 'techno', 'trance',
 ]
 
 
@@ -44,7 +58,8 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
         seeds = [artist]
 
     seed_ph = ",".join(["?"] * len(seeds))
-    tag_ph = ",".join(["?"] * len(SEED_TAGS))
+    pos_ph = ",".join(["?"] * len(POSITIVE_TAGS))
+    neg_ph = ",".join(["?"] * len(NEGATIVE_TAGS))
 
     rows = conn.execute(f"""
         WITH cooccurrence AS (
@@ -54,10 +69,16 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
             WHERE s1.artist IN ({seed_ph})
             GROUP BY s2.artist COLLATE NOCASE
         ),
-        tag_overlap AS (
+        pos_tags AS (
             SELECT at.artist, COUNT(*) as tag_matches
             FROM artist_tags at
-            WHERE at.tag IN ({tag_ph})
+            WHERE at.tag IN ({pos_ph})
+            GROUP BY at.artist COLLATE NOCASE
+        ),
+        neg_tags AS (
+            SELECT at.artist, COUNT(*) as bad_matches
+            FROM artist_tags at
+            WHERE at.tag IN ({neg_ph})
             GROUP BY at.artist COLLATE NOCASE
         ),
         all_plays AS (
@@ -72,13 +93,14 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
         )
         SELECT a.artist,
                COALESCE(c.shared, 0) as cooccurrence,
-               COALESCE(t.tag_matches, 0) as genre_match,
+               COALESCE(pt.tag_matches, 0) as genre_match,
                a.total_plays,
                a.last_play,
                al.begin_area,
                COALESCE(rr.newest, 0) as newest_release,
                (COALESCE(c.shared, 0) * 3
-                + COALESCE(t.tag_matches, 0) * 8
+                + COALESCE(pt.tag_matches, 0) * 8
+                - COALESCE(nt.bad_matches, 0) * 10
                 + CASE WHEN COALESCE(rr.newest, 0) >= 2024 THEN 20
                        WHEN COALESCE(rr.newest, 0) >= 2020 THEN 10 ELSE 0 END
                 - CASE WHEN a.total_plays > 200 THEN 30
@@ -87,7 +109,8 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
         FROM all_plays a
         JOIN artist_locations al ON a.artist = al.artist COLLATE NOCASE
         LEFT JOIN cooccurrence c ON a.artist = c.artist COLLATE NOCASE
-        LEFT JOIN tag_overlap t ON a.artist = t.artist COLLATE NOCASE
+        LEFT JOIN pos_tags pt ON a.artist = pt.artist COLLATE NOCASE
+        LEFT JOIN neg_tags nt ON a.artist = nt.artist COLLATE NOCASE
         LEFT JOIN recent_release rr ON a.artist = rr.artist COLLATE NOCASE
         WHERE al.is_local = 1
           AND a.total_plays BETWEEN ? AND ?
@@ -95,7 +118,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=300,
           AND a.artist NOT IN ({seed_ph})
         ORDER BY score DESC
         LIMIT ?
-    """, seeds + SEED_TAGS + [min_plays, max_plays, f"%{artist}%"] + seeds + [limit]).fetchall()
+    """, seeds + POSITIVE_TAGS + NEGATIVE_TAGS + [min_plays, max_plays, f"%{artist}%"] + seeds + [limit]).fetchall()
 
     return [
         {

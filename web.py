@@ -432,7 +432,8 @@ async function loadLeaderboard(){
 function showShowBill(){
   let html=`<div class="showbill-header">Find local Bay Area bands for a show bill. Enter a band name to find who fits.</div>`;
   html+=`<div class="showbill-input"><input type="text" id="showbillArtist" placeholder="Your band name..." value="The Lenticular Clouds"><button onclick="loadShowBill()">Find Bands</button></div>`;
-  html+=`<div id="showbillResults"></div>`;
+  html+=`<div id="showbillResults"></div>
+  <div id="showbillPitch" style="margin-top:1.5rem"></div>`;
   $('#content').innerHTML=html;
   loadShowBill();
 }
@@ -463,6 +464,27 @@ async function loadShowBill(){
     });
     html+='</tbody></table></div>';
     el.innerHTML=html;
+    // Generate bill proposals
+    const pitch=$('#showbillPitch');
+    if(data.length>=2){
+      const shoegaze=data.filter(r=>r.genre_match>=4).slice(0,2);
+      const artsy=data.filter(r=>r.seed_variety>=3).slice(0,2);
+      const venue=data.filter(r=>r.venue_confirmed).slice(0,2);
+      let ph='<div style="margin-top:1rem"><div class="filter-title" style="font-size:.8rem;margin-bottom:.8rem">Suggested Bills</div>';
+      const bills=[];
+      if(venue.length) bills.push({name:'Venue-Tested',acts:venue,note:'These bands already play Bottom of the Hill'});
+      if(shoegaze.length>=2) bills.push({name:'Genre Night',acts:shoegaze,note:'Strongest genre overlap'});
+      if(artsy.length>=2) bills.push({name:'DJ Picks',acts:artsy,note:'Paired together most by local DJs'});
+      bills.forEach(b=>{
+        ph+=`<div style="background:#332060;border:1px solid #5a3d7a;border-radius:6px;padding:.8rem;margin-bottom:.6rem">`;
+        ph+=`<div style="color:#e060a0;font-weight:600;font-size:.85rem;margin-bottom:.4rem">${b.name}</div>`;
+        ph+=`<div style="color:#e8e0f0;font-size:.9rem">${esc(artist)}</div>`;
+        b.acts.forEach(a=>ph+=`<div style="color:#c8a0c8;font-size:.85rem">+ ${esc(a.artist)} <span style="color:#7a6090;font-size:.75rem">${esc(a.city)}</span></div>`);
+        ph+=`<div style="color:#7a6090;font-size:.7rem;margin-top:.3rem">${b.note}</div></div>`;
+      });
+      ph+='</div>';
+      pitch.innerHTML=ph;
+    }
   }catch(err){el.innerHTML=`<div class="status error">Error: ${err.message}</div>`}
 }
 

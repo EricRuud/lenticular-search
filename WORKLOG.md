@@ -103,6 +103,38 @@
 - **Haley Heynderickx** — folk/singer-songwriter
 - **pardoner** — punk/rock, active, 99 plays
 
+## Iterations 15-17: Venue scale + Bottom of the Hill data
+
+**Added:** Scraped Bottom of the Hill's 2026 calendar. Bands confirmed to play BOTH get +25 bonus and a "BOTH" badge. LSD and the Search for God jumps to #1 (they're literally playing BOTH on Apr 5).
+
+**Removed:** Raw score column from UI, total_plays from Why signals. Lowered max_plays to 100 (BOTH scale).
+
+## Iteration 18: Two-hop taste chain
+
+**Result:** Went 2 degrees out from Lenticular Clouds' playlist. Found Red House Painters and The Brian Jonestown Massacre — both strongly in the right aesthetic neighborhood (slowcore and psych rock).
+
+**Evaluation:** The two-hop chain finds aesthetic allies that direct methods miss. Good for widening the net.
+
+## Iteration 19: Label connections
+
+**Result:** Mapped record labels across seed artists. Carpark Records connects Tanukichan, Fake Fruit, and Madeline Kenney. Polyvinyl connects Jay Som and Deerhoof.
+
+**Evaluation:** Label signal is noisy (many empty labels) but the Carpark connection is genuinely useful — shared label implies shared audience and booking circuit.
+
+## Iteration 20: Show bill generator
+
+**Added:** The UI now generates 3 "Suggested Bills" below the recommendation table:
+- **Venue-Tested** — bands that already play Bottom of the Hill
+- **Genre Night** — strongest genre overlap
+- **DJ Picks** — most frequently paired by local DJs
+
+**Removed:** N/A (this was pure add)
+
+**Three proposed bills:**
+1. Dream Pop Night: Lenticular Clouds + LSD and the Search for God + Sweet Trip
+2. Art Punk Night: Lenticular Clouds + Xiu Xiu + Everyone Is Dirty
+3. Indie Pop Night: Lenticular Clouds + Haley Heynderickx + Hemlocke Springs
+
 ## Iteration 14: Replace co-occurrence with same-set pairing
 
 **Added:** `same_set` signal — counts how many different seed artists a band gets paired with in the same DJ set (playlist). Weighted by `seed_variety` (diversity of pairings) rather than raw count. Weight: seed_variety * 6.

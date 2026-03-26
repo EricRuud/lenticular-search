@@ -147,6 +147,14 @@ function renderResults(data,band){
 
   let html='';
 
+  // Explanation blurb
+  const nRecs=data.recommendations.length;
+  const hasVenue=data.recommendations.some(r=>r.venue_confirmed);
+  html+=`<div style="text-align:center;color:#9a80b0;font-size:.8rem;margin-bottom:1.5rem;line-height:1.5">
+    Found <strong style="color:#e8e0f0">${nRecs} local bands</strong> that fit with <strong style="color:#e060a0">${esc(band)}</strong>.<br>
+    Based on Bay Area radio playlists, genre analysis, ${hasVenue?'venue lineups, ':''}and scene connections.
+  </div>`;
+
   // Suggested bills first
   if(data.bills && data.bills.length){
     html+='<div class="bills-section"><div class="bills-title">Suggested lineups</div>';
@@ -274,8 +282,18 @@ def api_recommend():
                 "note": "DJs consistently pair these with your taste neighborhood",
             })
 
+    # Count how many playlists the input artist appears on
+    play_count = conn.execute(
+        "SELECT COUNT(*) FROM spins WHERE artist LIKE ? COLLATE NOCASE",
+        (f"%{artist}%",)
+    ).fetchone()[0]
+
     conn.close()
-    return jsonify({"recommendations": recs, "bills": bills})
+    return jsonify({
+        "recommendations": recs,
+        "bills": bills,
+        "input_plays": play_count,
+    })
 
 
 @app.route("/api/artist-detail")

@@ -10,7 +10,8 @@
       "WebSearch",
       "WebFetch(domain:thelenticularclouds.bandcamp.com)",
       "WebFetch(domain:f4.bcbits.com)",
-      "WebFetch(domain:www.ifitstooloud.com)"
+      "WebFetch(domain:www.ifitstooloud.com)",
+      "WebFetch(domain:www.bottomofthehill.com)"
     ]
   }
 }

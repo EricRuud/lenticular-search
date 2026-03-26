@@ -162,8 +162,13 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
         LIMIT ?
     """, params).fetchall()
 
-    return [
-        {
+    from venues import is_venue_confirmed
+
+    results = []
+    for r in rows:
+        venue_confirmed = is_venue_confirmed(r[0])
+        final_score = r[7] + (25 if venue_confirmed else 0)
+        results.append({
             "artist": r[0],
             "seed_variety": r[1],
             "genre_match": r[2],
@@ -171,7 +176,9 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
             "last_play": r[4],
             "city": r[5] or "",
             "newest_release": r[6] if r[6] > 0 else None,
-            "score": r[7],
-        }
-        for r in rows
-    ]
+            "score": final_score,
+            "venue_confirmed": venue_confirmed,
+        })
+
+    results.sort(key=lambda x: -x["score"])
+    return results

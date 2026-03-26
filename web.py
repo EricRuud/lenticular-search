@@ -94,6 +94,7 @@ tr:hover td{background:#332060}
 .showbill-header{margin-bottom:1rem;color:#9a80b0;font-size:.85rem}
 .showbill-header strong{color:#e060a0}
 .rec-score{color:#e060a0;font-weight:700;font-variant-numeric:tabular-nums}
+.venue-badge{display:inline-block;font-size:.6rem;padding:.1rem .35rem;border-radius:3px;background:#4a3870;color:#c8a0c8;font-weight:600;margin-left:.35rem;vertical-align:middle}
 .rec-city{color:#c8a0c8;font-size:.75rem}
 .rec-signals{font-size:.7rem;color:#7a6090}
 .showbill-input{display:flex;gap:.5rem;margin-bottom:1rem}
@@ -445,18 +446,19 @@ async function loadShowBill(){
     const resp=await fetch(`/api/show-bill?artist=${encodeURIComponent(artist)}`);
     const data=await resp.json();
     if(!data.length){el.innerHTML='<div class="empty">No recommendations found. Try a different artist or check back as more data loads.</div>';return}
-    let html='<div class="table-wrap"><table><thead><tr><th>#</th><th>Band</th><th>City</th><th>Why</th><th>Latest Release</th><th>Score</th></tr></thead><tbody>';
+    let html='<div class="table-wrap"><table><thead><tr><th>#</th><th>Band</th><th>City</th><th>Why</th><th>Release</th></tr></thead><tbody>';
     data.forEach((r,i)=>{
       const signals=[];
+      if(r.venue_confirmed) signals.push('plays Bottom of the Hill');
       if(r.seed_variety>0) signals.push(`paired with ${r.seed_variety} similar artists`);
       if(r.genre_match>0) signals.push(`${r.genre_match} genre overlap`);
+      const badges=loc(true)+(r.venue_confirmed?'<span class="venue-badge">BOTH</span>':'');
       html+=`<tr>
         <td class="rank">${i+1}</td>
-        <td class="artist-name">${esc(r.artist)}${loc(true)}${mlinks(r.artist)}</td>
+        <td class="artist-name">${esc(r.artist)}${badges}${mlinks(r.artist)}</td>
         <td class="rec-city">${esc(r.city)}</td>
         <td class="rec-signals">${signals.join(' · ')}</td>
         <td>${r.newest_release||'?'}</td>
-        <td class="rec-score">${r.score}</td>
       </tr>`;
     });
     html+='</tbody></table></div>';

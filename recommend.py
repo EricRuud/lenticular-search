@@ -38,6 +38,28 @@ NEGATIVE_TAGS = [
     'edm', 'house', 'techno', 'trance',
 ]
 
+# Bands that score high due to co-occurrence but clearly don't fit the aesthetic.
+# Manually curated through iteration — these keep surfacing despite negative tags.
+EXCLUDE_ARTISTS = {
+    'deftones', 'cake', 'daniel johnston', 'jefferson airplane',
+    'sprints',  # Dublin, not Bay Area
+    'sparklehorse',  # inactive (Mark Linkous passed away)
+    'lucy dacus',  # Richmond VA, not Bay Area
+}
+
+
+# Bands that Bandcamp's algorithm recommends to Lenticular Clouds fans.
+# These are the highest-confidence taste signals we have.
+BANDCAMP_SIMILAR = {
+    'Sugar Candy Mountain',  # Oakland, psych pop
+    'Moon Duo',              # SF, psych rock
+    'somesurprises',         # Seattle, shoegaze/dream pop
+    'The Birds I Heard',     # Bay Area, harmonies
+    'Imp of Perverse',       # Texas, bedroom pop
+    'Junk Drawer',           # Belfast, art rock
+    'The Minus 5',           # Portland, indie pop
+}
+
 
 def get_seed_artists_from_playlists(conn, artist):
     """Find artists that share playlists with the given artist."""
@@ -50,7 +72,14 @@ def get_seed_artists_from_playlists(conn, artist):
         ORDER BY shared DESC
         LIMIT 20
     """, (f"%{artist}%",)).fetchall()
-    return [r[0] for r in rows]
+    playlist_seeds = [r[0] for r in rows]
+
+    # Add Bandcamp-similar artists as seeds too
+    for bc_artist in BANDCAMP_SIMILAR:
+        if bc_artist not in playlist_seeds:
+            playlist_seeds.append(bc_artist)
+
+    return playlist_seeds
 
 
 def get_taste_djs(conn, seeds, min_seed_artists=3):
@@ -101,7 +130,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
               + POSITIVE_TAGS + NEGATIVE_TAGS
               + (taste_djs if taste_djs else [])
               + [min_plays, max_plays, f"%{artist}%"]
-              + seeds + [limit])
+              + seeds + list(EXCLUDE_ARTISTS) + [limit])
 
     rows = conn.execute(f"""
         WITH same_set AS (
@@ -180,6 +209,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
           AND a.total_plays BETWEEN ? AND ?
           AND a.artist NOT LIKE ? COLLATE NOCASE
           AND a.artist NOT IN ({seed_ph})
+          AND LOWER(a.artist) NOT IN ({",".join(["?" for _ in EXCLUDE_ARTISTS])})
         ORDER BY score DESC
         LIMIT ?
     """, params).fetchall()

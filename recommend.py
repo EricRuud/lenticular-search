@@ -6,15 +6,21 @@ using co-occurrence, genre overlap, recency, and bookability signals.
 
 from db import get_connection
 
-# Genre tags that define the indie/psych/art-pop neighborhood
-POSITIVE_TAGS = [
+# Core genres — these are THE Lenticular Clouds genres (from Bandcamp tags)
+CORE_TAGS = [
+    'dream pop', 'shoegaze', 'psychedelic rock', 'psychedelic',
+    'psych rock', 'psych', 'psychedelic pop', 'freak folk',
+    'space rock', 'noise pop', 'lo-fi', 'indie psych',
+]
+
+# Adjacent genres — good fit but not as precise
+POSITIVE_TAGS = CORE_TAGS + [
     'indie rock', 'indie pop', 'rock', 'singer-songwriter', 'alternative rock',
-    'art pop', 'folk', 'freak folk', 'dream pop', 'psychedelic rock',
-    'garage rock', 'lo-fi', 'shoegaze', 'surf rock', 'jangle pop',
-    'post-punk', 'new wave', 'experimental rock', 'noise pop',
-    'indie', 'psychedelic', 'experimental', 'krautrock', 'art rock',
-    'psychedelic pop', 'noise pop', 'dark wave', 'glitch pop',
-    'indietronica', 'chamber pop', 'baroque pop', 'twee pop',
+    'art pop', 'folk', 'garage rock', 'surf rock', 'jangle pop',
+    'post-punk', 'new wave', 'experimental rock',
+    'indie', 'experimental', 'krautrock', 'art rock',
+    'dark wave', 'glitch pop', 'indietronica', 'chamber pop',
+    'baroque pop', 'twee pop', 'slowcore',
 ]
 
 # Tags that indicate a bad fit for the bill
@@ -46,6 +52,8 @@ EXCLUDE_ARTISTS = {
     'sparklehorse',  # inactive (Mark Linkous passed away)
     'lucy dacus',  # Richmond VA, not Bay Area
     'pacing',  # last release 2015, likely inactive
+    'xiu xiu',  # experimental noise, wrong vibe for psych pop bill
+    'tuxedomoon',  # legendary but 80s post-punk, not bookable for this
 }
 
 
@@ -159,6 +167,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
     taste_djs = get_taste_djs(conn, seeds, min_seed_artists=3)
 
     seed_ph = ",".join(["?"] * len(seeds))
+    core_ph = ",".join(["?"] * len(CORE_TAGS))
     pos_ph = ",".join(["?"] * len(POSITIVE_TAGS))
     neg_ph = ",".join(["?"] * len(NEGATIVE_TAGS))
     dj_ph = ",".join(["?"] * len(taste_djs)) if taste_djs else "''"
@@ -168,7 +177,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
     )
 
     params = (seeds + seeds
-              + POSITIVE_TAGS + NEGATIVE_TAGS
+              + CORE_TAGS + POSITIVE_TAGS + NEGATIVE_TAGS
               + (taste_djs if taste_djs else [])
               + [min_plays, max_plays, f"%{artist}%"]
               + seeds + list(EXCLUDE_ARTISTS) + [limit])
@@ -184,6 +193,12 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
             WHERE s1.artist IN ({seed_ph})
               AND s2.artist NOT IN ({seed_ph})
             GROUP BY s2.artist COLLATE NOCASE
+        ),
+        core_tags AS (
+            SELECT at.artist, COUNT(*) as core_matches
+            FROM artist_tags at
+            WHERE at.tag IN ({core_ph})
+            GROUP BY at.artist COLLATE NOCASE
         ),
         pos_tags AS (
             SELECT at.artist, COUNT(*) as tag_matches
@@ -228,7 +243,8 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
                al.begin_area,
                COALESCE(rr.newest, 0) as newest_release,
                (COALESCE(ss.seed_variety, 0) * 6
-                + COALESCE(pt.tag_matches, 0) * 8
+                + COALESCE(ct.core_matches, 0) * 15
+                + COALESCE(pt.tag_matches, 0) * 5
                 - COALESCE(nt.bad_matches, 0) * 15
                 + COALESCE(dj.dj_count, 0) * 5
                 + MIN(COALESCE(ae.vibe_hits, 0), 10) * 2
@@ -241,6 +257,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
         FROM all_plays a
         JOIN artist_locations al ON a.artist = al.artist COLLATE NOCASE
         LEFT JOIN same_set ss ON a.artist = ss.artist COLLATE NOCASE
+        LEFT JOIN core_tags ct ON a.artist = ct.artist COLLATE NOCASE
         LEFT JOIN pos_tags pt ON a.artist = pt.artist COLLATE NOCASE
         LEFT JOIN neg_tags nt ON a.artist = nt.artist COLLATE NOCASE
         LEFT JOIN dj_affinity dj ON a.artist = dj.artist COLLATE NOCASE

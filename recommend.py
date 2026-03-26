@@ -244,7 +244,8 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
             GROUP BY s.artist COLLATE NOCASE
         ),
         all_plays AS (
-            SELECT s.artist, COUNT(*) as total_plays, MAX(p.show_date) as last_play
+            SELECT s.artist, COUNT(*) as total_plays, MAX(p.show_date) as last_play,
+                   GROUP_CONCAT(DISTINCT p.station) as stations
             FROM spins s JOIN playlists p ON s.playlist_id = p.playlist_id
             GROUP BY s.artist COLLATE NOCASE
         ),
@@ -271,7 +272,8 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
                 - CASE WHEN COALESCE(rr.newest, 0) BETWEEN 1 AND 2014 THEN 25 ELSE 0 END
                 - CASE WHEN a.total_plays > 200 THEN 30
                        WHEN a.total_plays > 100 THEN 15 ELSE 0 END
-               ) as score
+               ) as score,
+               a.stations as station_list
         FROM all_plays a
         JOIN artist_locations al ON a.artist = al.artist COLLATE NOCASE
         LEFT JOIN same_set ss ON a.artist = ss.artist COLLATE NOCASE
@@ -322,16 +324,18 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
             (r[0],)
         ).fetchall()]
 
+        stations = r[8].split(",") if r[8] else []
+
         results.append({
             "artist": r[0],
             "seed_variety": r[1],
             "genre_match": r[2],
-            "total_plays": r[3],
             "last_play": r[4],
             "city": r[5] or "",
             "newest_release": r[6] if r[6] > 0 else None,
             "venue_confirmed": venue_confirmed,
             "tags": tags,
+            "stations": stations,
         })
 
     results.sort(key=lambda x: -(x["genre_match"] * 8 + x["seed_variety"] * 6 + (25 if x["venue_confirmed"] else 0) + scene_scores.get(x["artist"].lower(), 0) * 2))

@@ -88,7 +88,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 
 <div class="hero">
   <h1><span>Show Bill</span></h1>
-  <p>Who should you play with? Enter a band and we'll find Bay Area acts that belong on the same bill.</p>
+  <p>Find bands to play with in the Bay Area</p>
 </div>
 
 <div class="search-area">
@@ -189,6 +189,7 @@ function renderResults(data,band){
 
     html+=`<div class="band-card" id="card-${i}">
       <div class="band-top" style="cursor:pointer" data-artist="${esc(r.artist).replace(/"/g,'&quot;')}" data-idx="${i}" onclick="toggleDetail(this.dataset.artist,this.dataset.idx)">
+        <span style="color:#5a3d7a;font-size:.75rem;font-weight:700;margin-right:.3rem">#${i+1}</span>
         <span class="band-name">${esc(r.artist)}</span>
         ${r.city?`<span class="band-city">${esc(r.city)}</span>`:''}
         <div class="band-badges">${badges.join('')}</div>
@@ -197,7 +198,7 @@ function renderResults(data,band){
       <div class="band-links">
         <a href="https://bandcamp.com/search?q=${q}" target="_blank">bandcamp</a>
         <a href="https://open.spotify.com/search/${q}" target="_blank">spotify</a>
-        <a href="https://music.apple.com/us/search?term=${q}" target="_blank">apple music</a>
+        ${r.stations&&r.stations.length?`<span style="color:#5a3d7a;margin-left:auto;font-size:.7rem">on ${r.stations.join(', ')}</span>`:''}
       </div>
       <div class="band-detail" id="detail-${i}" style="display:none"></div>
     </div>`;

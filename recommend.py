@@ -45,6 +45,7 @@ EXCLUDE_ARTISTS = {
     'sprints',  # Dublin, not Bay Area
     'sparklehorse',  # inactive (Mark Linkous passed away)
     'lucy dacus',  # Richmond VA, not Bay Area
+    'pacing',  # last release 2015, likely inactive
 }
 
 
@@ -224,10 +225,27 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
 
     from venues import is_venue_confirmed
 
+    # Second pass: compute inter-recommendation connections (scene tightness)
+    artist_names = [r[0] for r in rows]
+    scene_scores = {}
+    if len(artist_names) >= 2:
+        art_ph = ",".join(["?"] * len(artist_names))
+        for artist in artist_names:
+            conn_count = conn.execute(f"""
+                SELECT COUNT(DISTINCT s2.artist)
+                FROM spins s1
+                JOIN spins s2 ON s1.playlist_id = s2.playlist_id
+                  AND s1.artist != s2.artist COLLATE NOCASE
+                WHERE s1.artist = ? COLLATE NOCASE
+                  AND s2.artist IN ({art_ph})
+            """, [artist] + artist_names).fetchone()[0]
+            scene_scores[artist.lower()] = conn_count
+
     results = []
     for r in rows:
         venue_confirmed = is_venue_confirmed(r[0])
-        final_score = r[7] + (25 if venue_confirmed else 0)
+        scene_bonus = min(scene_scores.get(r[0].lower(), 0), 15) * 2
+        final_score = r[7] + (25 if venue_confirmed else 0) + scene_bonus
         results.append({
             "artist": r[0],
             "seed_variety": r[1],

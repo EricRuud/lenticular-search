@@ -264,17 +264,29 @@ def index():
     return render_template_string(HTML)
 
 
+_rec_cache = {}
+_cache_ttl = 300  # 5 minutes
+
 @app.route("/api/recommend")
 def api_recommend():
+    import time as _time
     artist = request.args.get("artist", "").strip()
     if not artist:
         return jsonify({"error": "Enter a band name"}), 400
 
+    cache_key = artist.lower()
+    if cache_key in _rec_cache:
+        cached_at, cached_data = _rec_cache[cache_key]
+        if _time.time() - cached_at < _cache_ttl:
+            return jsonify(cached_data)
+
     conn = get_connection()
     recs = recommend_show_bill(conn, artist, limit=20)
-
     conn.close()
-    return jsonify({"recommendations": recs})
+
+    result = {"recommendations": recs}
+    _rec_cache[cache_key] = (_time.time(), result)
+    return jsonify(result)
 
 
 @app.route("/api/artist-detail")

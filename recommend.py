@@ -283,20 +283,22 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
     from venues import is_venue_confirmed
 
     # Second pass: compute inter-recommendation connections (scene tightness)
+    # Single query instead of N separate queries
     artist_names = [r[0] for r in rows]
     scene_scores = {}
     if len(artist_names) >= 2:
         art_ph = ",".join(["?"] * len(artist_names))
-        for artist in artist_names:
-            conn_count = conn.execute(f"""
-                SELECT COUNT(DISTINCT s2.artist)
-                FROM spins s1
-                JOIN spins s2 ON s1.playlist_id = s2.playlist_id
-                  AND s1.artist != s2.artist COLLATE NOCASE
-                WHERE s1.artist = ? COLLATE NOCASE
-                  AND s2.artist IN ({art_ph})
-            """, [artist] + artist_names).fetchone()[0]
-            scene_scores[artist.lower()] = conn_count
+        scene_rows = conn.execute(f"""
+            SELECT s1.artist, COUNT(DISTINCT s2.artist) as connections
+            FROM spins s1
+            JOIN spins s2 ON s1.playlist_id = s2.playlist_id
+              AND s1.artist != s2.artist COLLATE NOCASE
+            WHERE s1.artist IN ({art_ph}) COLLATE NOCASE
+              AND s2.artist IN ({art_ph}) COLLATE NOCASE
+            GROUP BY s1.artist COLLATE NOCASE
+        """, artist_names + artist_names).fetchall()
+        for sr in scene_rows:
+            scene_scores[sr[0].lower()] = sr[1]
 
     results = []
     for r in rows:

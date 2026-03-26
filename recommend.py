@@ -162,7 +162,7 @@ def get_taste_djs(conn, seeds, min_seed_artists=3):
     return [r[0] for r in rows]
 
 
-def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
+def recommend_show_bill(conn, artist, min_plays=5, max_plays=100,
                         recent_days=90, limit=30):
     """Generate show bill recommendations for an artist.
 
@@ -203,7 +203,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
     rows = conn.execute(f"""
         WITH same_set AS (
             SELECT s2.artist,
-                   COUNT(DISTINCT s1.playlist_id) as set_count,
+                   COUNT(*) as set_count,
                    COUNT(DISTINCT s1.artist) as seed_variety
             FROM spins s1
             JOIN spins s2 ON s1.playlist_id = s2.playlist_id
@@ -261,17 +261,18 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
                a.last_play,
                CASE WHEN al.begin_area != '' THEN al.begin_area ELSE al.area END,
                COALESCE(rr.newest, 0) as newest_release,
-               (COALESCE(ss.seed_variety, 0) * 6
-                + COALESCE(ct.core_matches, 0) * 15
-                + COALESCE(pt.tag_matches, 0) * 5
+               (CAST(COALESCE(ss.set_count, 0) * 100.0 / MAX(a.total_plays, 1) AS INT) * 2
+                + COALESCE(ss.seed_variety, 0) * 3
+                + COALESCE(ct.core_matches, 0) * 8
+                + COALESCE(pt.tag_matches, 0) * 3
                 - COALESCE(nt.bad_matches, 0) * 15
-                + COALESCE(dj.dj_count, 0) * 5
-                + MIN(COALESCE(ae.vibe_hits, 0), 10) * 2
-                + CASE WHEN COALESCE(rr.newest, 0) >= 2024 THEN 20
-                       WHEN COALESCE(rr.newest, 0) >= 2020 THEN 10 ELSE 0 END
-                - CASE WHEN COALESCE(rr.newest, 0) BETWEEN 1 AND 2014 THEN 25 ELSE 0 END
+                + COALESCE(dj.dj_count, 0) * 3
+                + MIN(COALESCE(ae.vibe_hits, 0), 10) * 1
+                + CASE WHEN COALESCE(rr.newest, 0) >= 2024 THEN 10
+                       WHEN COALESCE(rr.newest, 0) >= 2020 THEN 5 ELSE 0 END
+                - CASE WHEN COALESCE(rr.newest, 0) BETWEEN 1 AND 2014 THEN 20 ELSE 0 END
                 - CASE WHEN a.total_plays > 200 THEN 30
-                       WHEN a.total_plays > 100 THEN 15 ELSE 0 END
+                       WHEN a.total_plays > 100 THEN 10 ELSE 0 END
                ) as score,
                a.stations as station_list
         FROM all_plays a
@@ -294,29 +295,10 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
 
     from venues import is_venue_confirmed
 
-    # Second pass: compute inter-recommendation connections (scene tightness)
-    # Single query instead of N separate queries
-    artist_names = [r[0] for r in rows]
-    scene_scores = {}
-    if len(artist_names) >= 2:
-        art_ph = ",".join(["?"] * len(artist_names))
-        scene_rows = conn.execute(f"""
-            SELECT s1.artist, COUNT(DISTINCT s2.artist) as connections
-            FROM spins s1
-            JOIN spins s2 ON s1.playlist_id = s2.playlist_id
-              AND s1.artist != s2.artist COLLATE NOCASE
-            WHERE s1.artist IN ({art_ph}) COLLATE NOCASE
-              AND s2.artist IN ({art_ph}) COLLATE NOCASE
-            GROUP BY s1.artist COLLATE NOCASE
-        """, artist_names + artist_names).fetchall()
-        for sr in scene_rows:
-            scene_scores[sr[0].lower()] = sr[1]
-
     results = []
     for r in rows:
         venue_confirmed = is_venue_confirmed(r[0])
-        scene_bonus = min(scene_scores.get(r[0].lower(), 0), 15) * 2
-        final_score = r[7] + (25 if venue_confirmed else 0) + scene_bonus
+        final_score = r[7] + (20 if venue_confirmed else 0)
 
         # Fetch genre tags for display
         tags = [t[0] for t in conn.execute(
@@ -336,7 +318,8 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
             "venue_confirmed": venue_confirmed,
             "tags": tags,
             "stations": stations,
+            "_score": final_score,
         })
 
-    results.sort(key=lambda x: -(x["genre_match"] * 8 + x["seed_variety"] * 6 + (25 if x["venue_confirmed"] else 0) + scene_scores.get(x["artist"].lower(), 0) * 2))
+    results.sort(key=lambda x: -x["_score"])
     return results

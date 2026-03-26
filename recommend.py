@@ -44,16 +44,14 @@ NEGATIVE_TAGS = [
     'edm', 'house', 'techno', 'trance',
 ]
 
-# Bands that score high due to co-occurrence but clearly don't fit the aesthetic.
-# Manually curated through iteration — these keep surfacing despite negative tags.
+# Always exclude — deceased or not bookable regardless of genre
 EXCLUDE_ARTISTS = {
-    'deftones', 'cake', 'daniel johnston', 'jefferson airplane',
-    'sprints',  # Dublin, not Bay Area
-    'sparklehorse',  # inactive (Mark Linkous passed away)
-    'lucy dacus',  # Richmond VA, not Bay Area
-    'pacing',  # last release 2015, likely inactive
-    'xiu xiu',  # experimental noise, wrong vibe for psych pop bill
-    'tuxedomoon',  # legendary but 80s post-punk, not bookable for this
+    'daniel johnston',      # deceased
+    'sparklehorse',         # deceased
+    'jefferson airplane',   # long broken up
+    'pacing',               # last release 2015
+    'sprints',              # Dublin, not Bay Area
+    'lucy dacus',           # Richmond VA, not Bay Area
 }
 
 
@@ -78,9 +76,12 @@ LINEUP_PEERS = {
 }
 
 
-# Extra seeds only applied for specific artists we've researched
+# Extra seeds and exclusions for specifically researched artists
 CURATED_SEEDS = {
     "the lenticular clouds": list(BANDCAMP_SIMILAR) + list(LINEUP_PEERS),
+}
+CURATED_EXCLUDES = {
+    "the lenticular clouds": {'deftones', 'cake', 'xiu xiu', 'tuxedomoon', 'julie'},
 }
 
 
@@ -139,6 +140,13 @@ def get_seed_artists_from_playlists(conn, artist):
     return playlist_seeds
 
 
+def get_excludes(artist):
+    """Get exclusion set for a specific artist."""
+    excludes = set(EXCLUDE_ARTISTS)
+    excludes.update(CURATED_EXCLUDES.get(artist.lower(), set()))
+    return excludes
+
+
 def get_taste_djs(conn, seeds, min_seed_artists=3):
     """Find DJs whose playlists contain multiple seed artists."""
     seed_ph = ",".join(["?"] * len(seeds))
@@ -180,6 +188,8 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
     neg_ph = ",".join(["?"] * len(NEGATIVE_TAGS))
     dj_ph = ",".join(["?"] * len(taste_djs)) if taste_djs else "''"
 
+    all_excludes = get_excludes(artist)
+
     aesthetic_clause = " OR ".join(
         [f"s.song LIKE '%{k}%' OR s.album LIKE '%{k}%'" for k in AESTHETIC_KEYWORDS]
     )
@@ -188,7 +198,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
               + CORE_TAGS + POSITIVE_TAGS + NEGATIVE_TAGS
               + (taste_djs if taste_djs else [])
               + [min_plays, max_plays, f"%{artist}%"]
-              + seeds + list(EXCLUDE_ARTISTS) + [limit])
+              + seeds + list(all_excludes) + [limit])
 
     rows = conn.execute(f"""
         WITH same_set AS (
@@ -275,7 +285,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
           AND a.total_plays BETWEEN ? AND ?
           AND a.artist NOT LIKE ? COLLATE NOCASE
           AND a.artist NOT IN ({seed_ph})
-          AND LOWER(a.artist) NOT IN ({",".join(["?" for _ in EXCLUDE_ARTISTS])})
+          AND LOWER(a.artist) NOT IN ({",".join(["?" for _ in all_excludes])})
         ORDER BY score DESC
         LIMIT ?
     """, params).fetchall()

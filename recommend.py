@@ -18,6 +18,15 @@ POSITIVE_TAGS = [
 ]
 
 # Tags that indicate a bad fit for the bill
+# Dreamy/psych aesthetic keywords in song/album titles
+AESTHETIC_KEYWORDS = [
+    'dream', 'cloud', 'moon', 'cosmic', 'mystic', 'crystal',
+    'sun', 'star', 'ocean', 'mountain', 'heaven', 'ghost', 'fog',
+    'haze', 'shimmer', 'glow', 'echo', 'kaleidoscope', 'prism',
+    'flower', 'garden', 'rainbow', 'aurora', 'nebula', 'astral',
+    'ethereal', 'twilight', 'velvet', 'honey', 'meadow',
+]
+
 NEGATIVE_TAGS = [
     'metal', 'heavy metal', 'thrash metal', 'death metal', 'nu metal',
     'alternative metal', 'funk metal', 'speed metal', 'black metal',
@@ -84,6 +93,10 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
     neg_ph = ",".join(["?"] * len(NEGATIVE_TAGS))
     dj_ph = ",".join(["?"] * len(taste_djs)) if taste_djs else "''"
 
+    aesthetic_clause = " OR ".join(
+        [f"s.song LIKE '%{k}%' OR s.album LIKE '%{k}%'" for k in AESTHETIC_KEYWORDS]
+    )
+
     params = (seeds + seeds
               + POSITIVE_TAGS + NEGATIVE_TAGS
               + (taste_djs if taste_djs else [])
@@ -121,6 +134,12 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
             WHERE p.dj_name IN ({dj_ph})
             GROUP BY s.artist COLLATE NOCASE
         ),
+        aesthetic AS (
+            SELECT s.artist, COUNT(*) as vibe_hits
+            FROM spins s
+            WHERE {aesthetic_clause}
+            GROUP BY s.artist COLLATE NOCASE
+        ),
         all_plays AS (
             SELECT s.artist, COUNT(*) as total_plays, MAX(p.show_date) as last_play
             FROM spins s JOIN playlists p ON s.playlist_id = p.playlist_id
@@ -142,6 +161,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
                 + COALESCE(pt.tag_matches, 0) * 8
                 - COALESCE(nt.bad_matches, 0) * 15
                 + COALESCE(dj.dj_count, 0) * 5
+                + MIN(COALESCE(ae.vibe_hits, 0), 10) * 2
                 + CASE WHEN COALESCE(rr.newest, 0) >= 2024 THEN 20
                        WHEN COALESCE(rr.newest, 0) >= 2020 THEN 10 ELSE 0 END
                 - CASE WHEN COALESCE(rr.newest, 0) BETWEEN 1 AND 2014 THEN 25 ELSE 0 END
@@ -154,6 +174,7 @@ def recommend_show_bill(conn, artist, min_plays=3, max_plays=100,
         LEFT JOIN pos_tags pt ON a.artist = pt.artist COLLATE NOCASE
         LEFT JOIN neg_tags nt ON a.artist = nt.artist COLLATE NOCASE
         LEFT JOIN dj_affinity dj ON a.artist = dj.artist COLLATE NOCASE
+        LEFT JOIN aesthetic ae ON a.artist = ae.artist COLLATE NOCASE
         LEFT JOIN recent_release rr ON a.artist = rr.artist COLLATE NOCASE
         WHERE al.is_local = 1
           AND a.total_plays BETWEEN ? AND ?

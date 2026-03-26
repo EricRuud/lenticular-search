@@ -190,7 +190,8 @@ function renderResults(data,band){
   data.recommendations.forEach((r,i)=>{
     const badges=[];
     if(r.venue_confirmed) badges.push('<span class="badge badge-venue">PLAYS BOTTOM OF THE HILL</span>');
-    if(r.newest_release && r.newest_release>=2025) badges.push(`<span class="badge badge-active">NEW RELEASE ${r.newest_release}</span>`);
+    const recent=r.last_play&&(new Date(r.last_play)>new Date(Date.now()-14*86400000));
+    if(recent) badges.push('<span class="badge badge-active">ON AIR NOW</span>');
 
     const q=encodeURIComponent(r.artist);
     const tagHtml=(r.tags||[]).map(t=>`<span style="color:#9a80b0;font-size:.7rem;background:#332060;padding:.1rem .35rem;border-radius:3px">${esc(t)}</span>`).join(' ');

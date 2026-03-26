@@ -173,6 +173,68 @@
 13. Hemlocke Springs — Concord
 14. Fake Fruit — post-punk, Oakland
 
+## Iterations 25-26: Bandcamp recommendation engine + exclusion list
+
+**Added:** Scraped Bandcamp's "if you like" section. Found Sugar Candy Mountain (Oakland psych pop), Moon Duo (SF psych), The Birds I Heard (Bay Area). Added as seeds. Manual exclusion list for persistent misfits (Deftones, Cake, SPRINTS).
+
+## Iterations 27-28: Real show lineups + lineup peer seeds
+
+**Added:** Songkick data for Sugar Candy Mountain, Moon Duo, Wooden Shjips shows. Bands that opened for them (Assemble Head in Sunburst Sound, Lumerians, Skinshape, Enumclaw, Wisp) added as LINEUP_PEERS.
+
+## Iteration 29: Bandcamp release date verification
+
+**Result:** Hot Flash Heat Wave released Mar 2026 (very active). pure hex Mar 2025. Welcome Strawberry Jul 2025. Pacing last release 2015 (removed as likely inactive).
+
+## Iteration 30: Scene graph / community tightness
+
+**Added:** Scene tightness bonus — bands that connect to many other recs get boosted. Identified core cluster: Tanukichan ↔ Fake Fruit ↔ Topographies ↔ Wooden Shjips ↔ Whirr ↔ Duster ↔ pure hex ↔ Everyone Is Dirty ↔ Welcome Strawberry. pure hex connects to 17/20 recs.
+
+## Iteration 31: Bandcamp fan collection overlap
+
+**Explored:** Scraped 5 Lenticular Clouds supporters' Bandcamp collections. Found their taste leans more experimental/electronic/new-age (M. Sage, Emily A. Sprague, Moon Letters) vs the radio-sourced indie rock recs. Both valid — radio recs better for a Bottom of the Hill rock show.
+
+---
+
+# FINAL RECOMMENDATIONS (after 31 iterations)
+
+**Tier 1 — Strongest fit (play BOTH, core scene, right genre):**
+1. LSD and the Search for God — SF shoegaze, plays Bottom of the Hill Apr 5
+2. Tanukichan — shoegaze/dream pop, 9 seed pairings, core scene
+3. Whirr — SF shoegaze, core scene cluster
+4. Hot Flash Heat Wave — SF dream pop/garage, released new album Mar 2026
+
+**Tier 2 — Excellent fit (strong signals, active):**
+5. pure hex — SF, connects to 17 other recs, released Mar 2025
+6. Fake Fruit — Oakland post-punk, released 2024
+7. Everyone Is Dirty — post-punk/art rock, released 2023
+8. Welcome Strawberry — Oakland, released Jul 2025
+9. Wooden Shjips — SF psych rock, Ripley Johnson project
+10. Sweet Trip — SF dream pop/glitch pop
+
+**Tier 3 — Good fit (worth exploring):**
+11. Topographies — SF post-punk/shoegaze/dark wave
+12. Chime School — indie pop, released 2024
+13. The Telephone Numbers — SF, released 2025
+14. Gumby's Junk — Oakland, released 2025
+15. Duster — San Jose slowcore/shoegaze
+16. Ty Segall — Palo Alto psych/garage (may be too big)
+17. Xiu Xiu — San Jose experimental (may be too experimental)
+18. The Spiral Electric — psych, released 2019
+19. Ryli — released 2025
+20. Whitney's Playland — released 2023
+
+**Signal sources used:**
+- Bay Area radio co-occurrence (6 stations, 6 months)
+- MusicBrainz genre tags (positive + negative)
+- Bandcamp "if you like" recommendations
+- Real show lineup data (Songkick)
+- Bottom of the Hill 2026 calendar
+- Aesthetic keyword matching (song/album titles)
+- DJ taste affinity
+- Scene graph / community tightness
+- Bandcamp release date verification
+- Bandcamp fan collection overlap
+
 ## Iteration 14: Replace co-occurrence with same-set pairing
 
 **Added:** `same_set` signal — counts how many different seed artists a band gets paired with in the same DJ set (playlist). Weighted by `seed_variety` (diversity of pairings) rather than raw count. Weight: seed_variety * 6.

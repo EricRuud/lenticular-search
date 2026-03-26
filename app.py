@@ -155,14 +155,29 @@ function renderResults(data,band){
     Based on Bay Area radio playlists, genre analysis, ${hasVenue?'venue lineups, ':''}and scene connections.
   </div>`;
 
-  // Suggested bills first
-  if(data.bills && data.bills.length){
+  // Build specific bill suggestions from tag data
+  const recs=data.recommendations;
+  const hasTags=(r,list)=>(r.tags||[]).some(t=>list.includes(t));
+  const gaze=recs.filter(r=>hasTags(r,['shoegaze','dream pop','noise pop','space rock']));
+  const psych=recs.filter(r=>hasTags(r,['psychedelic rock','psychedelic','psych rock','garage rock']));
+  const punk=recs.filter(r=>hasTags(r,['post-punk','new wave','dark wave']));
+  const folk=recs.filter(r=>hasTags(r,['folk','singer-songwriter','freak folk','lo-fi']));
+  const venue=recs.filter(r=>r.venue_confirmed);
+
+  const bills=[];
+  if(gaze.length>=2) bills.push({theme:'Shoegaze Night',acts:gaze.slice(0,2),note:'Wall of sound, heads down, pedals on'});
+  if(psych.length>=2) bills.push({theme:'Psych Rock Triple Bill',acts:psych.slice(0,2),note:'Cosmic vibes, long jams, third eyes open'});
+  if(venue.length) bills.push({theme:'Venue-Tested',acts:venue.slice(0,2),note:'Already confirmed at Bottom of the Hill'});
+  if(punk.length>=2 && bills.length<3) bills.push({theme:'Post-Punk Night',acts:punk.slice(0,2),note:'Angular guitars, driving bass, art damage'});
+  if(folk.length>=2 && bills.length<3) bills.push({theme:'Quiet Storm',acts:folk.slice(0,2),note:'Stripped back, intimate, songwriter-focused'});
+
+  if(bills.length){
     html+='<div class="bills-section"><div class="bills-title">Suggested lineups</div>';
-    data.bills.forEach(b=>{
+    bills.slice(0,3).forEach(b=>{
       html+=`<div class="bill"><div class="bill-theme">${esc(b.theme)}</div><div class="bill-lineup">`;
       html+=`<div class="you">${esc(band)}</div>`;
       b.acts.forEach(a=>{html+=`<div>+ ${esc(a.artist)} <span style="color:#7a6090;font-size:.8rem">${esc(a.city)}</span></div>`});
-      html+=`</div><div class="bill-note">${esc(b.note)}</div></div>`;
+      html+=`</div><div class="bill-note">${b.note}</div></div>`;
     });
     html+='</div>';
   }
@@ -253,47 +268,8 @@ def api_recommend():
     conn = get_connection()
     recs = recommend_show_bill(conn, artist, limit=20)
 
-    # Generate bill suggestions
-    bills = []
-    venue_acts = [r for r in recs if r.get("venue_confirmed")]
-    genre_acts = [r for r in recs if r.get("genre_match", 0) >= 4]
-    scene_acts = [r for r in recs if r.get("seed_variety", 0) >= 5]
-
-    if venue_acts:
-        bills.append({
-            "theme": "Venue-Tested",
-            "acts": [{"artist": a["artist"], "city": a["city"]} for a in venue_acts[:2]],
-            "note": "These bands already play Bottom of the Hill",
-        })
-    if genre_acts and len(genre_acts) >= 2:
-        picks = [a for a in genre_acts if a not in venue_acts][:2]
-        if picks:
-            bills.append({
-                "theme": "Genre Match",
-                "acts": [{"artist": a["artist"], "city": a["city"]} for a in picks],
-                "note": "Strongest sonic overlap with your music",
-            })
-    if scene_acts and len(scene_acts) >= 2:
-        picks = [a for a in scene_acts if a not in venue_acts and a not in genre_acts][:2]
-        if picks:
-            bills.append({
-                "theme": "Scene Picks",
-                "acts": [{"artist": a["artist"], "city": a["city"]} for a in picks],
-                "note": "DJs consistently pair these with your taste neighborhood",
-            })
-
-    # Count how many playlists the input artist appears on
-    play_count = conn.execute(
-        "SELECT COUNT(*) FROM spins WHERE artist LIKE ? COLLATE NOCASE",
-        (f"%{artist}%",)
-    ).fetchone()[0]
-
     conn.close()
-    return jsonify({
-        "recommendations": recs,
-        "bills": bills,
-        "input_plays": play_count,
-    })
+    return jsonify({"recommendations": recs})
 
 
 @app.route("/api/artist-detail")

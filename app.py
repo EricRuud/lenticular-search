@@ -130,13 +130,18 @@ $('#searchForm').addEventListener('submit',async e=>{
   const band=$('#bandInput').value.trim();
   if(!band) return;
   $('#goBtn').disabled=true;
-  $('#results').innerHTML='<div class="status"><span class="spinner"></span>Searching...</div>';
+  const msgs=['Checking 6 radio stations...','Matching genres...','Scanning show lineups...','Building your bill...'];
+  let mi=0;
+  $('#results').innerHTML=`<div class="status"><span class="spinner"></span>${msgs[0]}</div>`;
+  const msgTimer=setInterval(()=>{mi++;if(mi<msgs.length)$('#results .status').innerHTML=`<span class="spinner"></span>${msgs[mi]}`},1500);
   try{
     const resp=await fetch(`/api/recommend?artist=${encodeURIComponent(band)}`);
     const data=await resp.json();
+    clearInterval(msgTimer);
     if(data.error) throw new Error(data.error);
     renderResults(data,band);
   }catch(err){
+    clearInterval(msgTimer);
     $('#results').innerHTML=`<div class="status error">${err.message}</div>`;
   }
   $('#goBtn').disabled=false;
@@ -158,15 +163,7 @@ function renderResults(data,band){
 
   let html='';
 
-  // Explanation blurb
-  const nRecs=data.recommendations.length;
-  const hasVenue=data.recommendations.some(r=>r.venue_confirmed);
-  html+=`<div style="text-align:center;color:#9a80b0;font-size:.8rem;margin-bottom:1.5rem;line-height:1.5">
-    Found <strong style="color:#e8e0f0">${nRecs} local bands</strong> that fit with <strong style="color:#e060a0">${esc(band)}</strong>.<br>
-    Based on Bay Area radio playlists, genre analysis, ${hasVenue?'venue lineups, ':''}and scene connections.
-  </div>`;
-
-  // Build specific bill suggestions from tag data
+  // Build bill suggestions from tag data
   const recs=data.recommendations;
   const hasTags=(r,list)=>(r.tags||[]).some(t=>list.includes(t));
   const gaze=recs.filter(r=>hasTags(r,['shoegaze','dream pop','noise pop','space rock']));

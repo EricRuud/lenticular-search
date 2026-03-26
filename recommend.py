@@ -103,13 +103,21 @@ def get_seed_artists_from_playlists(conn, artist):
 
     # If very few playlist seeds, supplement with genre-similar artists
     if len(playlist_seeds) < 5:
-        # Get this artist's tags
+        # Get this artist's tags from DB
         tags = [r[0] for r in conn.execute(
             "SELECT tag FROM artist_tags WHERE artist LIKE ? COLLATE NOCASE",
             (f"%{artist}%",)
         ).fetchall()]
+        # If not in DB, try MusicBrainz live
         if not tags:
-            tags = list(POSITIVE_TAGS[:10])  # fallback to generic indie tags
+            try:
+                from kalx import _fetch_musicbrainz_artist
+                mb_tags, _, _ = _fetch_musicbrainz_artist(artist)
+                tags = [t[0] for t in (mb_tags or [])]
+            except Exception:
+                pass
+        if not tags:
+            tags = list(CORE_TAGS)  # final fallback
         tag_ph = ",".join(["?"] * len(tags))
         genre_seeds = conn.execute(f"""
             SELECT at.artist, COUNT(*) as overlap

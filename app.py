@@ -70,21 +70,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .bill-lineup .you{color:#e8e0f0;font-weight:600}
 .bill-note{color:#7a6090;font-size:.7rem;margin-top:.3rem}
 
-/* Artist detail */
-.back-link{color:#9a80b0;cursor:pointer;font-size:.85rem;margin-bottom:1rem;display:inline-block}
-.back-link:hover{color:#e060a0}
-.detail-header{margin-bottom:1rem}
-.detail-header h2{font-size:1.3rem;margin-bottom:.2rem}
-.detail-header p{color:#9a80b0;font-size:.85rem}
-.tracks-list{list-style:none}
-.tracks-list li{padding:.4rem 0;border-bottom:1px solid #332060;display:flex;justify-content:space-between;align-items:center}
-.track-name{color:#e8e0f0;font-size:.85rem}
-.track-meta{color:#7a6090;font-size:.75rem}
-.track-links{font-size:.7rem}
-.track-links a{color:#7a6090;text-decoration:none;margin-left:.5rem}
-.track-links a:hover{color:#e060a0}
-
-.footer{text-align:center;padding:2rem;color:#5a3d7a;font-size:.7rem}
 
 @media(max-width:600px){
   .hero{padding:2rem 1rem 1.5rem}
@@ -129,6 +114,7 @@ $('#searchForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const band=$('#bandInput').value.trim();
   if(!band) return;
+  history.replaceState(null,'',`?band=${encodeURIComponent(band)}`);
   $('#goBtn').disabled=true;
   const msgs=['Checking 6 radio stations...','Matching genres...','Scanning show lineups...','Building your bill...'];
   let mi=0;
@@ -229,20 +215,20 @@ async function toggleDetail(artist,idx){
   try{
     const resp=await fetch(`/api/artist-detail?artist=${encodeURIComponent(artist)}`);
     const data=await resp.json();
-    let html='';
+    let html=`<div style="margin-top:.5rem;font-size:.8rem;color:#9a80b0">
+      ${data.tracks.length} tracks on Bay Area radio`;
+    if(data.city) html+=` · From ${esc(data.city)}`;
+    if(data.newest_release) html+=` · Latest release: ${data.newest_release}`;
+    html+=`</div>`;
     if(data.tracks.length){
-      html+='<ul class="tracks-list" style="margin-top:.5rem">';
-      data.tracks.slice(0,8).forEach(t=>{
+      html+='<div style="margin-top:.4rem;display:flex;flex-wrap:wrap;gap:.3rem">';
+      data.tracks.slice(0,6).forEach(t=>{
         const q=encodeURIComponent(data.artist+' '+t.song);
-        html+=`<li><span class="track-name">${esc(t.song)}</span>
-          <span class="track-meta">${esc(t.album)}${t.year?' ('+t.year+')':''}
-            <span class="track-links">
-              <a href="https://open.spotify.com/search/${q}" target="_blank">spotify</a>
-              <a href="https://bandcamp.com/search?q=${q}" target="_blank">bandcamp</a>
-            </span></span></li>`;
+        html+=`<a href="https://open.spotify.com/search/${q}" target="_blank"
+          style="font-size:.75rem;color:#c8a0c8;background:#332060;padding:.2rem .5rem;border-radius:4px;text-decoration:none">${esc(t.song)}</a>`;
       });
-      html+='</ul>';
-    }else{html='<div style="color:#7a6090;font-size:.8rem;padding:.5rem 0">No tracks found on Bay Area radio</div>'}
+      html+='</div>';
+    }
     el.innerHTML=html;
     el.dataset.loaded='1';
   }catch(err){el.innerHTML=`<div class="status error">${err.message}</div>`}
@@ -250,6 +236,10 @@ async function toggleDetail(artist,idx){
 
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 function tryBand(name){$('#bandInput').value=name;$('#searchForm').dispatchEvent(new Event('submit'))}
+
+// URL state — load from ?band= param
+const params=new URLSearchParams(window.location.search);
+if(params.get('band')){$('#bandInput').value=params.get('band');$('#searchForm').dispatchEvent(new Event('submit'))}
 </script>
 </body>
 </html>

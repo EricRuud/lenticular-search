@@ -103,21 +103,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 
 <div class="hero">
   <h1><span>Show Bill</span></h1>
-  <p>Find Bay Area bands to play with. Enter your band and we'll find who fits.</p>
+  <p>Who should you play with? Enter a band and we'll find Bay Area acts that belong on the same bill.</p>
 </div>
 
 <div class="search-area">
   <form id="searchForm" class="search-box">
-    <input type="text" id="bandInput" placeholder="Your band name..." value="The Lenticular Clouds" autofocus>
+    <input type="text" id="bandInput" placeholder="Enter a band name..." autofocus>
     <button type="submit" id="goBtn">Find Bands</button>
   </form>
+  <div style="text-align:center;margin-top:.5rem;font-size:.75rem;color:#7a6090">
+    Try: <a style="color:#9a80b0;cursor:pointer" onclick="tryBand('The Lenticular Clouds')">The Lenticular Clouds</a>
+    · <a style="color:#9a80b0;cursor:pointer" onclick="tryBand('Fake Fruit')">Fake Fruit</a>
+    · <a style="color:#9a80b0;cursor:pointer" onclick="tryBand('E-40')">E-40</a>
+    · <a style="color:#9a80b0;cursor:pointer" onclick="tryBand('Ty Segall')">Ty Segall</a>
+  </div>
 </div>
 
 <div class="results" id="results"></div>
 
-<div class="footer">
-  Built from 6 months of Bay Area radio data, Bandcamp recommendations, venue lineups, and genre analysis.
-</div>
 
 <script>
 const $=s=>document.querySelector(s);
@@ -240,9 +243,7 @@ async function toggleDetail(artist,idx){
 }
 
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
-
-// Auto-search on load
-$('#searchForm').dispatchEvent(new Event('submit'));
+function tryBand(name){$('#bandInput').value=name;$('#searchForm').dispatchEvent(new Event('submit'))}
 </script>
 </body>
 </html>

@@ -456,7 +456,7 @@ async function loadShowBill(){
       const badges=(r.venue_confirmed?'<span class="venue-badge">BOTH</span>':'');
       html+=`<tr>
         <td class="rank">${i+1}</td>
-        <td class="artist-name"><a class="playlist-link" data-artist="${esc(r.artist).replace(/"/g,'&quot;')}" onclick="previewArtist(this.dataset.artist)">${esc(r.artist)}</a>${badges}${mlinks(r.artist)}</td>
+        <td class="artist-name"><a class="playlist-link" data-artist="${esc(r.artist).replace(/"/g,'&quot;')}" onclick="previewArtist(this.dataset.artist)">${esc(r.artist)}</a>${badges} <a href="https://bandcamp.com/search?q=${encodeURIComponent(r.artist)}" target="_blank" rel="noopener" style="color:#7a6090;font-size:.7rem;text-decoration:none">&nbsp;bandcamp</a></td>
         <td class="rec-city">${esc(r.city)}</td>
         <td class="rec-signals">${signals.join(' · ')}</td>
         <td>${r.newest_release||'?'}</td>

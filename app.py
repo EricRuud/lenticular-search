@@ -192,56 +192,51 @@ function renderResults(data,band){
     const q=encodeURIComponent(r.artist);
     const tagHtml=(r.tags||[]).map(t=>`<span style="color:#9a80b0;font-size:.7rem;background:#332060;padding:.1rem .35rem;border-radius:3px">${esc(t)}</span>`).join(' ');
 
-    html+=`<div class="band-card">
-      <div class="band-top">
-        <a class="band-name" style="cursor:pointer;text-decoration:none;color:#e8e0f0" data-artist="${esc(r.artist).replace(/"/g,'&quot;')}" onclick="showDetail(this.dataset.artist)">${esc(r.artist)}</a>
+    html+=`<div class="band-card" id="card-${i}">
+      <div class="band-top" style="cursor:pointer" data-artist="${esc(r.artist).replace(/"/g,'&quot;')}" data-idx="${i}" onclick="toggleDetail(this.dataset.artist,this.dataset.idx)">
+        <span class="band-name">${esc(r.artist)}</span>
         ${r.city?`<span class="band-city">${esc(r.city)}</span>`:''}
         <div class="band-badges">${badges.join('')}</div>
       </div>
-      ${tagHtml?`<div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.4rem">${tagHtml}</div>`:''}
+      ${tagHtml?`<div style="display:flex;gap:.3rem;flex-wrap:wrap;margin:.3rem 0">${tagHtml}</div>`:''}
       <div class="band-links">
         <a href="https://bandcamp.com/search?q=${q}" target="_blank">bandcamp</a>
         <a href="https://open.spotify.com/search/${q}" target="_blank">spotify</a>
         <a href="https://music.apple.com/us/search?term=${q}" target="_blank">apple music</a>
       </div>
+      <div class="band-detail" id="detail-${i}" style="display:none"></div>
     </div>`;
   });
   html+=`</div>`;
   $('#results').innerHTML=html;
 }
 
-async function showDetail(artist){
-  const prev=$('#results').innerHTML;
-  window._prevResults=prev;
-  $('#results').innerHTML=`<div class="status"><span class="spinner"></span>Loading...</div>`;
+async function toggleDetail(artist,idx){
+  const el=$(`#detail-${idx}`);
+  if(el.style.display!=='none'){el.style.display='none';return}
+  el.style.display='block';
+  if(el.dataset.loaded){return}
+  el.innerHTML='<div class="status"><span class="spinner"></span></div>';
   try{
     const resp=await fetch(`/api/artist-detail?artist=${encodeURIComponent(artist)}`);
     const data=await resp.json();
-    let html=`<div class="back-link" onclick="$('#results').innerHTML=window._prevResults">&larr; Back</div>`;
-    html+=`<div class="detail-header"><h2>${esc(data.artist)}</h2>`;
-    html+=`<p>${esc(data.city)}${data.newest_release?' · Latest release: '+data.newest_release:''}</p></div>`;
+    let html='';
     if(data.tracks.length){
-      html+=`<ul class="tracks-list">`;
-      data.tracks.forEach(t=>{
+      html+='<ul class="tracks-list" style="margin-top:.5rem">';
+      data.tracks.slice(0,8).forEach(t=>{
         const q=encodeURIComponent(data.artist+' '+t.song);
         html+=`<li><span class="track-name">${esc(t.song)}</span>
           <span class="track-meta">${esc(t.album)}${t.year?' ('+t.year+')':''}
             <span class="track-links">
               <a href="https://open.spotify.com/search/${q}" target="_blank">spotify</a>
               <a href="https://bandcamp.com/search?q=${q}" target="_blank">bandcamp</a>
-            </span>
-          </span></li>`;
+            </span></span></li>`;
       });
-      html+=`</ul>`;
-    }else{
-      html+=`<div class="empty">No tracks found on Bay Area radio.</div>`;
-    }
-    html+=`<div style="margin-top:1rem"><div class="band-links">
-      <a href="https://bandcamp.com/search?q=${encodeURIComponent(data.artist)}" target="_blank">bandcamp</a>
-      <a href="https://open.spotify.com/search/${encodeURIComponent(data.artist)}" target="_blank">spotify</a>
-    </div></div>`;
-    $('#results').innerHTML=html;
-  }catch(err){$('#results').innerHTML=`<div class="status error">${err.message}</div>`}
+      html+='</ul>';
+    }else{html='<div style="color:#7a6090;font-size:.8rem;padding:.5rem 0">No tracks found on Bay Area radio</div>'}
+    el.innerHTML=html;
+    el.dataset.loaded='1';
+  }catch(err){el.innerHTML=`<div class="status error">${err.message}</div>`}
 }
 
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}

@@ -102,3 +102,13 @@
 - **Duster** — slowcore/shoegaze, San Jose
 - **Haley Heynderickx** — folk/singer-songwriter
 - **pardoner** — punk/rock, active, 99 plays
+
+## Iteration 14: Replace co-occurrence with same-set pairing
+
+**Added:** `same_set` signal — counts how many different seed artists a band gets paired with in the same DJ set (playlist). Weighted by `seed_variety` (diversity of pairings) rather than raw count. Weight: seed_variety * 6.
+
+**Removed:** Raw `cooccurrence` — just counted shared playlists, which surfaced popular bands appearing everywhere regardless of aesthetic fit.
+
+**Result:** New discoveries: Hemlocke Springs (Concord), The Telephone Numbers (SF), Gumby's Junk (Oakland), Chime School, Ty Segall. These weren't visible before. Deftones still persists (seed_variety=8 because freeform DJs pair everything together).
+
+**Evaluation:** Same-set pairing is a tighter signal than co-occurrence. The `seed_variety` metric (how many *different* seed artists you're paired with) captures genuine aesthetic affinity. New candidates feel right. Need to increase negative tag weight again for Deftones, or add a "too eclectic DJ" discount.

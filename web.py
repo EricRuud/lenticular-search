@@ -448,7 +448,7 @@ async function loadShowBill(){
     let html='<div class="table-wrap"><table><thead><tr><th>#</th><th>Band</th><th>City</th><th>Why</th><th>Latest Release</th><th>Score</th></tr></thead><tbody>';
     data.forEach((r,i)=>{
       const signals=[];
-      if(r.cooccurrence>0) signals.push(`${r.cooccurrence} shared playlists`);
+      if(r.seed_variety>0) signals.push(`paired with ${r.seed_variety} similar artists`);
       if(r.genre_match>0) signals.push(`${r.genre_match} genre matches`);
       signals.push(`${r.total_plays} plays`);
       html+=`<tr>
